@@ -1,0 +1,6 @@
+{
+  "appId": "com.example.qalaalmamal",
+  "appName": "قلاع المعمل",
+  "webDir": "www",
+  "server": { "androidScheme": "https" }
+}

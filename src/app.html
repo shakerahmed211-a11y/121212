@@ -1,0 +1,267 @@
+<title>قلاع المعمل</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Reem+Kufi:wght@600&display=swap">
+<style>
+/* Layout: survey-sheet look. Map of Egypt's 27 governorates beside the question panel; stacked on phones. */
+:root{
+  --bg:#e8edf0; --surface:#f5f8f9; --ink:#12283a; --muted:#566b7a; --line:#b4c3ce;
+  --sea:#cadce8; --land:#eef2ef; --hatch:#b6cddc; --tgt:#12283a; --btn:#12283a; --btnink:#f5f8f9;
+  --ok:#1b7a4b; --bad:#b3261e; --warn:#8a5a00;
+  --p1:#0072B2; --p1i:#ffffff; --p2:#E69F00; --p2i:#201400; --p3:#CC79A7; --p3i:#2b0b1e; --p4:#009E73; --p4i:#00241a;
+  --shadow:0 1px 0 rgba(18,40,58,.08), 0 6px 18px rgba(18,40,58,.08);
+  --fd:'Reem Kufi','IBM Plex Sans Arabic',system-ui,sans-serif; --fb:'IBM Plex Sans Arabic',system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif; --fm:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0a1a27; --surface:#102536; --ink:#e3edf4; --muted:#93a9b9; --line:#2b4457;
+  --sea:#0c2a3e; --land:#17384e; --hatch:#12354b; --tgt:#ffffff; --btn:#e3edf4; --btnink:#0a1a27;
+  --ok:#5fd39a; --bad:#ff8a80; --warn:#f2c14e; --shadow:0 1px 0 rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.3); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0a1a27; --surface:#102536; --ink:#e3edf4; --muted:#93a9b9; --line:#2b4457;
+  --sea:#0c2a3e; --land:#17384e; --hatch:#12354b; --tgt:#ffffff; --btn:#e3edf4; --btnink:#0a1a27;
+  --ok:#5fd39a; --bad:#ff8a80; --warn:#f2c14e; --shadow:0 1px 0 rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.3); color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--fb);font-size:16px;line-height:1.55;direction:rtl;
+  padding-block:14px 28px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.app{max-width:1120px;margin-inline:auto;display:flex;flex-direction:column;gap:14px}
+h1,h2,h3{font-family:var(--fd);font-weight:600;margin:0;line-height:1.25;text-wrap:balance}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,.tile:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--fd);font-size:1.35rem}
+.brand svg{width:30px;height:30px;flex:none}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow);min-width:0}
+.btn{background:var(--btn);color:var(--btnink);border:0;border-radius:10px;padding:12px 18px;font-weight:600;min-height:48px}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--ink)}
+.btn.sm{min-height:40px;padding:8px 12px;font-size:.92rem}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.muted{color:var(--muted)}
+.small{font-size:.9rem}
+input[type=text]{font:inherit;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;min-height:48px;width:100%;min-width:0}
+select{font:inherit;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);border-radius:10px;padding:9px 10px;min-height:44px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 12px;font-size:.88rem;background:var(--bg)}
+.dot{width:12px;height:12px;border-radius:50%;flex:none;display:inline-block}
+.num{font-variant-numeric:tabular-nums}
+.code{font-family:var(--fm);font-size:2.2rem;letter-spacing:.18em;direction:ltr;unicode-bidi:isolate;text-transform:uppercase}
+
+/* home */
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;align-items:stretch}
+.hero h2{font-size:clamp(1.8rem,5vw,2.8rem)}
+.hero p{margin:.5rem 0 0;max-width:46ch}
+.minimap{background:var(--sea);border:1px solid var(--line);border-radius:12px;display:grid;place-items:center;padding:8px;min-height:200px}
+.minimap svg{width:100%;max-height:300px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.field label{display:block;font-weight:600;margin-bottom:6px}
+.notice{border:1.5px dashed var(--line);border-radius:10px;padding:10px 12px;font-size:.92rem;color:var(--muted)}
+
+/* lobby */
+.lobby{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.plist{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.pitem{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--bg);min-height:50px}
+.pitem.empty{border-style:dashed;color:var(--muted)}
+.badge{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-family:var(--fd);font-size:1rem;flex:none}
+.seg{display:flex;border:1.5px solid var(--ink);border-radius:10px;overflow:hidden}
+.seg button{flex:1;background:transparent;border:0;padding:9px 8px;min-height:44px;border-inline-start:1px solid var(--ink)}
+.seg button:first-child{border-inline-start:0}
+.seg button[aria-pressed=true]{background:var(--btn);color:var(--btnink);font-weight:600}
+.seg button[disabled]{cursor:default}
+
+/* game */
+.game{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;align-items:start}
+.mapcard{padding:10px;display:flex;flex-direction:column;gap:8px}
+.mapwrap{position:relative;border-radius:8px;overflow:hidden;background:var(--sea);touch-action:none;border:1px solid var(--line)}
+#map{display:block;width:100%;height:auto;aspect-ratio:var(--ar,1.1);cursor:grab;user-select:none;-webkit-user-select:none}
+.zoom{display:flex;flex-wrap:wrap;gap:6px}
+.zoom button{min-width:44px;height:40px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:1.1rem;line-height:1;padding:0 12px}
+.zoom button.txt{font-size:.9rem}
+.tp{fill:var(--land);stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke;transition:fill .25s}
+.tp.own{stroke:var(--ink);stroke-width:1.2}
+.tp.tgt{stroke:var(--tgt);stroke-width:3;stroke-dasharray:7 5;animation:dash 1s linear infinite}
+.tp.sel{stroke:var(--tgt);stroke-width:4;stroke-dasharray:none}
+@keyframes dash{to{stroke-dashoffset:-24}}
+.lb{font-family:var(--fb);font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--land);stroke-width:3px;stroke-linejoin:round;pointer-events:none;text-anchor:middle}
+.lb.own{stroke:none}
+.mk{pointer-events:none}
+.cap{min-height:2.6em;font-size:.92rem}
+.legend{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:.82rem;color:var(--muted)}
+
+.bar{height:8px;background:var(--bg);border:1px solid var(--line);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ink);transition:width .25s linear}
+.qhead{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.qtext{font-size:1.18rem;font-weight:500;line-height:1.7;margin:.4rem 0 .2rem;overflow-wrap:anywhere}
+.opts{display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px}
+.opt{display:flex;align-items:center;gap:10px;text-align:start;background:var(--bg);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;min-height:54px;width:100%}
+.opt .l{width:28px;height:28px;border-radius:7px;border:1.5px solid var(--ink);display:grid;place-items:center;font-weight:600;flex:none}
+.opt .ot{flex:1;min-width:0;overflow-wrap:anywhere}
+.opt .ot[dir=ltr]{text-align:right}
+.opt:hover:not([disabled]){border-color:var(--ink)}
+.opt.sel{border-color:var(--ink);border-width:2.5px}
+.opt.ok{border-color:var(--ok);border-width:2.5px}
+.opt.ok .l{background:var(--ok);border-color:var(--ok);color:var(--bg)}
+.opt.no{border-color:var(--bad);border-width:2.5px}
+.opt.no .l{background:var(--bad);border-color:var(--bad);color:var(--bg)}
+.opt .mk2{font-weight:600;font-size:.85rem;white-space:nowrap}
+.opt[disabled]{cursor:default}
+.tgts{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.tg{border:1.5px solid var(--ink);background:var(--bg);border-radius:10px;padding:7px 11px;min-height:44px;text-align:start;line-height:1.3}
+.tg small{display:block;color:var(--muted)}
+.tg[aria-pressed=true]{background:var(--btn);color:var(--btnink)}
+.tg[aria-pressed=true] small{color:inherit;opacity:.85}
+.hint{border-inline-start:4px solid var(--ink);padding:6px 12px;background:var(--bg);border-radius:6px;margin:8px 0}
+.log{margin:8px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.log li{display:flex;gap:8px;align-items:flex-start;font-size:.96rem}
+.score{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.sc{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--surface);display:flex;flex-direction:column;gap:4px;min-width:0}
+.sc.me{border-color:var(--ink);border-width:2px}
+.sc.out{opacity:.55}
+.sc .nm{display:flex;gap:8px;align-items:center;font-weight:600;min-width:0}
+.sc .nm span.t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc .st{display:flex;justify-content:space-between;gap:6px;font-size:.86rem;color:var(--muted)}
+.pips{display:inline-flex;gap:3px;align-items:center}
+.pips i{width:9px;height:9px;border-radius:2px;border:1.5px solid var(--ink);display:inline-block}
+.pips i.f{background:var(--bad);border-color:var(--bad)}
+
+/* over */
+.rank{display:flex;flex-direction:column;gap:10px;margin:12px 0}
+.rk{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg)}
+.rk.win{border:2.5px solid var(--ink)}
+.rk .pos{font-family:var(--fd);font-size:1.6rem;width:34px;text-align:center}
+
+/* review */
+.rv{display:flex;flex-direction:column;gap:10px}
+.rq{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface)}
+.rq.flag{border-color:var(--bad);border-width:2px}
+.rq ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:4px}
+.rq li{padding:4px 8px;border-radius:6px}
+.rq li.c{background:color-mix(in srgb,var(--ok) 18%,transparent);font-weight:600}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--btn);color:var(--btnink);padding:10px 16px;border-radius:10px;z-index:20;max-width:90vw;box-shadow:var(--shadow)}
+
+@media (max-width:860px){
+  .hero,.lobby,.game{grid-template-columns:1fr}
+  .qtext{font-size:1.1rem}
+}
+@media (min-width:640px){.opts{grid-template-columns:1fr 1fr}}
+@media (max-width:860px) and (min-width:640px){.opts{grid-template-columns:1fr 1fr}}
+@media (prefers-reduced-motion:reduce){.tp.tgt{animation:none}.bar i,.tp{transition:none}}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand" id="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 28V10h4v3h3v-3h4v3h3v-3h4v3h3v-3h4v18z" fill="currentColor"/><path d="M13 28v-7a3 3 0 0 1 6 0v7z" fill="var(--bg)"/></svg>
+      <span>قلاع المعمل</span>
+    </div>
+    <button class="btn ghost sm" id="btnHome" hidden>الرئيسية</button>
+  </header>
+
+  <section id="home" class="stack">
+    <div class="hero">
+      <div class="card stack">
+        <div>
+          <h2>اغزُ محافظات مصر بمعلوماتك</h2>
+          <p class="muted">أسئلة تربة وخرسانة وأسفلت وركام، ومعاها ثقافة عامة وحساب. اللي يجاوب صح يضم رقعة جديدة أو يهاجم محافظة جاره، وأربع هجمات ناجحة تهدّ القلعة.</p>
+        </div>
+        <div class="field">
+          <label for="inName">اسمك في اللعبة</label>
+          <input type="text" id="inName" maxlength="18" autocomplete="off" placeholder="مثلًا: م. أحمد">
+        </div>
+        <div class="row">
+          <button class="btn" id="btnSolo">العب ضد الكمبيوتر</button>
+          <button class="btn ghost" id="btnCreate">افتح غرفة</button>
+        </div>
+        <div class="field">
+          <label for="inCode">عندك كود غرفة؟</label>
+          <div class="row" style="flex-wrap:nowrap">
+            <input type="text" id="inCode" maxlength="5" autocomplete="off" inputmode="text" dir="ltr" placeholder="ABCDE" style="font-family:var(--fm);letter-spacing:.15em;text-transform:uppercase">
+            <button class="btn ghost" id="btnJoin" style="flex:none">ادخل</button>
+          </div>
+        </div>
+        <div class="notice" id="netNote" hidden></div>
+        <div class="row"><button class="btn ghost sm" id="btnReview">مراجعة أسئلة المعمل فنيًا</button></div>
+      </div>
+      <div class="minimap" aria-hidden="true"><svg id="miniSvg" viewBox="0 0 10 10"></svg></div>
+    </div>
+  </section>
+
+  <section id="lobby" hidden class="stack">
+    <div class="lobby">
+      <div class="card stack">
+        <div class="qhead"><h3>اللاعبين</h3><span class="chip num" id="lbCount"></span></div>
+        <div id="lbRoomBox">
+          <div class="muted small">كود الغرفة، ابعته لأصحابك</div>
+          <div class="row"><span class="code" id="lbCode"></span><button class="btn ghost sm" id="btnCopy">نسخ</button></div>
+        </div>
+        <ul class="plist" id="lbPlayers"></ul>
+        <div class="row" id="lbCpu"></div>
+      </div>
+      <div class="card stack">
+        <h3>إعدادات الجولة</h3>
+        <div class="field"><label>نوع الأسئلة</label>
+          <div class="seg" id="segMode" role="group">
+            <button data-v="lab" aria-pressed="false">معمل</button>
+            <button data-v="gen" aria-pressed="false">عام</button>
+            <button data-v="mix" aria-pressed="true">مختلط</button>
+          </div></div>
+        <div class="field"><label>عدد الأسئلة</label>
+          <div class="seg" id="segN" role="group">
+            <button data-v="20" aria-pressed="false">20</button>
+            <button data-v="30" aria-pressed="true">30</button>
+            <button data-v="40" aria-pressed="false">40</button>
+          </div></div>
+        <div class="muted small" id="lbRules">كل سؤال عليه مؤقت. اللي يجاوب صح يختار رقعة بجانب أرضه ويضمها. لو الرقعة تابعة لمنافس، الهجوم بينجح بس لو جاوب غلط أو جاوب أبطأ منك. القلعة بتقع بعد 4 هجمات ناجحة.</div>
+        <div class="row">
+          <button class="btn" id="btnStart">ابدأ اللعب</button>
+          <button class="btn ghost" id="btnLeave">خروج</button>
+        </div>
+        <div class="muted small" id="lbWait"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="game" hidden>
+    <div class="game">
+      <div class="card mapcard">
+        <div class="mapwrap" id="mapwrap">
+          <svg id="map" role="img" aria-label="خريطة محافظات مصر"></svg>
+        </div>
+          <div class="zoom">
+            <button id="zIn" aria-label="تكبير">+</button>
+            <button id="zOut" aria-label="تصغير">−</button>
+            <button id="zDelta" class="txt">الدلتا</button>
+            <button id="zAll" class="txt">كل مصر</button>
+          </div>
+        <div class="cap" id="cap" aria-live="polite">اضغط على أي محافظة تشوف تفاصيلها.</div>
+        <div class="legend"><span>مدّ الخريطة أو كبّرها عشان تلاقي المحافظات الصغيرة</span></div>
+      </div>
+      <div class="stack" style="min-width:0">
+        <div class="card" id="panel"></div>
+        <div class="score" id="score"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="over" hidden class="card">
+    <h2 id="ovTitle"></h2>
+    <div class="rank" id="ovRank"></div>
+    <div class="row"><button class="btn" id="btnAgain">لعبة جديدة</button><button class="btn ghost" id="btnOverHome">الرئيسية</button></div>
+    <div class="muted small" id="ovNote"></div>
+  </section>
+
+  <section id="review" hidden class="stack">
+    <div class="card stack">
+      <h2>مراجعة أسئلة المعمل</h2>
+      <p class="muted" style="margin:0">الأسئلة دي مكتوبة من معرفة عامة وممكن يكون فيها رقم أو شرط غلط، لازم مهندس متخصص يراجعها قبل ما تتوزع على الفنيين. علّم أي سؤال فيه مشكلة وصدّر الملاحظات.</p>
+      <div class="row">
+        <select id="rvCat" aria-label="الفئة"></select>
+        <input type="text" id="rvSearch" placeholder="ابحث في الأسئلة" style="flex:1;min-width:140px">
+        <span class="chip num" id="rvCount"></span>
+      </div>
+      <div class="row"><button class="btn sm" id="rvExport">تصدير الأسئلة المعلّمة</button><span class="muted small" id="rvFlags"></span></div>
+    </div>
+    <div class="rv" id="rvList"></div>
+    <button class="btn ghost" id="rvMore" hidden>عرض المزيد</button>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
