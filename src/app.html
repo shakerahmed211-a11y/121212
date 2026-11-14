@@ -105,6 +105,9 @@ select{font:inherit;color:var(--ink);background:var(--bg);border:1.5px solid var
 .opts{display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px}
 .opt{display:flex;align-items:center;gap:10px;text-align:start;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:10px 12px;min-height:60px;width:100%;font-size:1.04rem;box-shadow:0 3px 0 rgba(0,0,0,.16);transition:transform .08s}
 .opt:active:not([disabled]){transform:translateY(2px)}
+.opt.dim{opacity:.3;text-decoration:line-through;box-shadow:none}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.14)}}
+.ring.low{animation:pulse 1s ease-in-out infinite}
 .opt .l{width:32px;height:32px;border-radius:9px;background:var(--btn);color:var(--btnink);display:grid;place-items:center;font-weight:700;flex:none}
 .opt .ot{flex:1;min-width:0;overflow-wrap:anywhere}
 .opt .ot[dir=ltr]{text-align:right}
@@ -191,7 +194,7 @@ details.how p{margin:.2rem 0 0}
 }
 @media (min-width:640px){.opts{grid-template-columns:1fr 1fr}}
 @media (max-width:860px) and (min-width:640px){.opts{grid-template-columns:1fr 1fr}}
-@media (prefers-reduced-motion:reduce){.tp.tgt,.tp.fl,.btn.big,.opt.ok,.opt.no{animation:none}.bar i,.tp{transition:none}}
+@media (prefers-reduced-motion:reduce){.tp.tgt,.tp.fl,.btn.big,.opt.ok,.opt.no,.ring.low{animation:none}.bar i,.tp{transition:none}}
 </style>
 
 <div class="app">
@@ -238,7 +241,7 @@ details.how p{margin:.2rem 0 0}
       </div></div>
     <details class="how">
       <summary>إزاي تلعب؟</summary>
-      <p class="muted small">كل سؤال عليه مؤقت. اللي يجاوب صح يغمر محافظة بجانب أرضه بالمعرفة. لو المحافظة تابعة لمنافس، الغمر بينجح بس لو جاوب غلط أو جاوب أبطأ منك. منبع كل لاعب بيجف بعد 4 غمرات ناجحة عليه.</p>
+      <p class="muted small">كل سؤال عليه مؤقت قصير، وأول واحد يجاوب صح بيقفل الوقت على الباقي في ثواني. الأسرع بياخد نقاط أكتر. اللي يجاوب صح يغمر محافظة بجانب أرضه، ولو تابعة لمنافس بينجح الغمر بس لو جاوب أبطأ منك أو غلط. المنبع بيجف بعد 4 غمرات ناجحة عليه. تلميح تلقائي بيبهّت إجابة غلط في نص الوقت، ومعاك مرتين تحذف إجابتين (بيضيف 3 ثواني على وقتك).</p>
     </details>
     <button class="btn ghost" id="btnReview">مراجعة أسئلة المعمل فنيًا</button>
   </aside>
@@ -305,7 +308,7 @@ details.how p{margin:.2rem 0 0}
             <button data-v="30" aria-pressed="true">30</button>
             <button data-v="40" aria-pressed="false">40</button>
           </div></div>
-        <div class="muted small" id="lbRules">كل سؤال عليه مؤقت. اللي يجاوب صح يختار محافظة بجانب أرضه ويغمرها بالمعرفة. لو المحافظة تابعة لمنافس، الغمر بينجح بس لو جاوب غلط أو جاوب أبطأ منك. المنبع بيجف بعد 4 غمرات ناجحة عليه.</div>
+        <div class="muted small" id="lbRules">كل سؤال عليه مؤقت قصير، وأول واحد يجاوب صح بيقفل الوقت على الباقي. الأسرع بياخد نقاط أكتر. اللي يجاوب صح يختار محافظة بجانب أرضه ويغمرها بالمعرفة. لو تابعة لمنافس، الغمر بينجح بس لو جاوب أبطأ منك أو غلط. المنبع بيجف بعد 4 غمرات ناجحة عليه.</div>
         <div class="row">
           <button class="btn" id="btnStart">ابدأ اللعب</button>
           <button class="btn ghost" id="btnLeave">خروج</button>

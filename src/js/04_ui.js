@@ -13,7 +13,9 @@ const SND={on:store.get('qm_snd',true),ctx:null,
   good(){this.play([[660,.12,0],[880,.12,.1],[1175,.22,.2]]);this.vib(35)},
   bad(){this.play([[220,.18,0,'sawtooth'],[165,.28,.14,'sawtooth']]);this.vib([60,40,60])},
   win(){this.play([[523,.14,0],[659,.14,.14],[784,.14,.28],[1047,.4,.42]]);this.vib([40,30,40,30,90])},
-  end(){this.play([[392,.2,0],[330,.3,.2]])}};
+  end(){this.play([[392,.2,0],[330,.3,.2]])},
+  tick(){this.play([[1000,.04,0,'square']])}};
+let lastTick=-1;
 addEventListener('pointerdown',()=>SND.wake(),{passive:true});
 function confetti(){const box=h('div',{class:'confetti','aria-hidden':'true'});for(let i=0;i<70;i++)box.append(h('i',{style:`left:${R(0,100)}%;background:${COLV[R(0,3)]};animation-delay:${(Math.random()*.9).toFixed(2)}s;animation-duration:${(2.2+Math.random()*2).toFixed(2)}s`}));document.body.append(box);setTimeout(()=>box.remove(),5200)}
 function onPhase(prev,next){
@@ -292,10 +294,10 @@ function renderScore(){
     const castle=p.cs&&!p.out;
     let tag='';
     if(p.out)tag='خرج';else if(p.gone)tag='غاب';else if(S.ph==='q')tag=S.ans[i]?'أجاب ✓':'بيفكر';
-    else if(S.rv&&S.ph!=='lobby')tag=S.rv.ch[i]===S.rv.ci?'صح ✓':(S.rv.ch[i]<0?'ما جاوبش':'غلط ✗');
+    else if(S.rv&&S.ph!=='lobby')tag=S.rv.ch[i]===S.rv.ci?'صح ✓'+((S.rv.pt&&S.rv.pt[i])?' +'+S.rv.pt[i]:''):(S.rv.ch[i]<0?'ما جاوبش':'غلط ✗');
     box.append(h('div',{class:'sc'+(i===me?' me':'')+(p.out?' out':'')},
       h('div',{class:'nm'},dot(i),h('span',{class:'t',text:p.nm+(i===me?' (أنت)':'')})),
-      h('div',{class:'st'},h('span',{class:'num',text:tilesCount(i)+' محافظة · '+p.ok+' صح'}),h('span',{text:p.cpu?LVL[p.cpu]:''})),
+      h('div',{class:'st'},h('span',{class:'num',text:tilesCount(i)+' محافظة · '+(p.pts||0)+' نقطة'})),
       h('div',{class:'prog','aria-hidden':'true'},h('i',{style:`width:${tilesCount(i)/GEO.ids.length*100}%;background:${COLV[p.ci]}`})),
       h('div',{class:'st'},
         castle?h('span',{class:'pips','aria-label':'ضربات المنبع '+(S.ht[p.cs]||0)+' من 4'},[0,1,2,3].map(k=>h('i',{class:k<(S.ht[p.cs]||0)?'f':''})),h('span',{style:'margin-inline-start:6px',text:'منبع'})):h('span',{text:p.out?'المنبع جفّ':''}),
@@ -304,15 +306,16 @@ function renderScore(){
 }
 function optButtons(interactive){
   const q=S.q,rv=S.rv,me=myIdx();
+  const hid=new Set(rv?[]:[...(S.hd||[]),...((S.hf&&me>=0&&S.hf[me])||[])]);
   return q.o.map((txt,k)=>{
-    const cls=['opt'];
+    const cls=['opt'];if(hid.has(k))cls.push('dim');
     let mark=null;
     if(rv){
       if(k===rv.ci){cls.push('ok');mark='✓ الصح'}
       else if(me>=0&&rv.ch[me]===k){cls.push('no');mark='✗'}
     }else if(choice===k)cls.push('sel');
     const who=rv?S.pl.map((p,i)=>rv.ch[i]===k?i:-1).filter(i=>i>=0):[];
-    return h('button',{class:cls.join(' '),disabled:!interactive,'aria-pressed':!rv&&choice===k?'true':null,onclick:()=>pickAnswer(k)},
+    return h('button',{class:cls.join(' '),disabled:!interactive||hid.has(k),'aria-pressed':!rv&&choice===k?'true':null,onclick:()=>pickAnswer(k)},
       h('span',{class:'l',text:LET[k]}),
       h('span',{class:'ot',dir:q.ltr?'ltr':'auto',text:txt}),
       mark?h('span',{class:'mk2',text:mark}):null,
@@ -346,8 +349,14 @@ function renderPanel(){
   box.append(h('div',{class:'qtext',text:q.t}));
   if(S.ph==='q'){
     box.append(h('div',{class:'opts'},optButtons(mine&&choice<0)));
+    if(mine&&choice<0){
+      const left=S.pl[me].h||0,vis=[0,1,2,3].filter(k=>!(S.hd||[]).includes(k)).length,used=!!(S.hf&&S.hf[me]);
+      box.append(h('div',{class:'row',style:'margin-top:10px;align-items:center'},
+        h('button',{class:'btn ghost sm',disabled:left<=0||used||vis<=2,onclick:()=>{SND.click();send({k:'f',n:S.n})},text:`حذف إجابتين (${left})`}),
+        h('span',{class:'small muted',text:'بيضيف 3 ثواني على وقتك'})));
+    }
     const need=S.pl.filter(p=>!p.out&&!p.gone).length,got=S.ans.filter(Boolean).length;
-    box.append(h('div',{class:'hint'},me<0?'أنت متفرج في الغرفة دي.':!mine?'مش بتشارك في الجولة دي.':choice>=0?`تم تثبيت إجابتك. جاوب ${got} من ${need}.`:'اختار إجابتك. كل ما جاوبت أسرع كل ما أخدت أولوية في اختيار المحافظة.'));
+    box.append(h('div',{class:'hint'},me<0?'أنت متفرج في الغرفة دي.':!mine?'مش بتشارك في الجولة دي.':choice>=0?`تم تثبيت إجابتك. جاوب ${got} من ${need}.`:(S.ls?'حد جاوب صح! باقي ثواني قليلة.':'اختار إجابتك. الأسرع بياخد نقاط أكتر وأولوية في اختيار المحافظة.')));
     return;
   }
   box.append(h('div',{class:'opts'},optButtons(false)));
@@ -370,16 +379,24 @@ function renderPanel(){
   const log=S.rv.log;
   box.append(h('ul',{class:'log'},log.length?log.map(e=>h('li',null,dot(e[1]),h('span',{text:logText(e)}))):h('li',{class:'muted',text:'محدش جاوب صح المرة دي.'})));
   if(S.rv.s)box.append(h('div',{class:'small muted',style:'margin-top:8px',text:'المرجع: '+S.rv.s}));
-  box.append(h('div',{class:'small muted',style:'margin-top:8px',id:'nextIn'}));
+  const pts=S.pl.map((p,i)=>S.rv.pt&&S.rv.pt[i]>0?pname(i)+' +'+S.rv.pt[i]:'').filter(Boolean);
+  if(pts.length)box.append(h('div',{class:'small',style:'margin-top:8px',text:'نقاط السرعة: '+pts.join('، ')}));
+  const me2=myIdx();
+  if(me2>=0&&!S.pl[me2].gone&&S.n<S.N){
+    const ready=(S.nx||[]).includes(me2);
+    box.append(h('div',{class:'row',style:'margin-top:10px;align-items:center'},
+      h('button',{class:'btn sm',disabled:ready,onclick:()=>{SND.click();send({k:'x',n:S.n})},text:ready?'بانتظار الباقي':'التالي'}),
+      h('span',{class:'small muted',id:'nextIn'})));
+  }else box.append(h('div',{class:'small muted',style:'margin-top:8px',id:'nextIn'}));
 }
 function renderOver(){
-  const r=S.pl.map((p,i)=>({i,t:tilesCount(i),ok:p.ok,out:p.out})).sort((a,b)=>(b.t-a.t)||(b.ok-a.ok));
+  const r=S.pl.map((p,i)=>({i,t:tilesCount(i),pts:p.pts||0,ok:p.ok,out:p.out})).sort((a,b)=>(b.t-a.t)||(b.pts-a.pts)||(b.ok-a.ok));
   const alive=S.pl.filter(p=>!p.out).length;
   $('#ovTitle').textContent=S.win>=0?'الفايز: '+pname(S.win):'انتهت اللعبة';
   const box=$('#ovRank');box.textContent='';
   r.forEach((x,k)=>box.append(h('div',{class:'rk'+(k===0?' win':'')},h('div',{class:'pos num',text:String(k+1)}),dot(x.i),
-    h('div',{style:'flex:1;min-width:0'},h('div',{style:'font-weight:600',text:pname(x.i)+(x.i===myIdx()?' (أنت)':'')}),h('div',{class:'small muted num',text:`${x.t} محافظة · ${x.ok} إجابة صح`+(x.out?' · منبعه جفّ':'')})))));
-  $('#ovNote').textContent=alive<=1?'اللعبة خلصت لأن آخر منبع فضل شغال.':`اللعبة خلصت بعد ${S.N} سؤال، والترتيب بعدد المحافظات ثم عدد الإجابات الصح.`;
+    h('div',{style:'flex:1;min-width:0'},h('div',{style:'font-weight:600',text:pname(x.i)+(x.i===myIdx()?' (أنت)':'')}),h('div',{class:'small muted num',text:`${x.t} محافظة · ${x.pts} نقطة · ${x.ok} إجابة صح`+(x.out?' · منبعه جفّ':'')})))));
+  $('#ovNote').textContent=alive<=1?'اللعبة خلصت لأن آخر منبع فضل شغال.':`اللعبة خلصت بعد ${S.N} سؤال، والترتيب بعدد المحافظات ثم نقاط السرعة.`;
   $('#btnAgain').hidden=!isHost();
   if(!isHost())$('#ovNote').textContent+=' في انتظار صاحب الغرفة يبدأ لعبة جديدة.';
 }
@@ -392,7 +409,8 @@ function tick(){
   const tn=$('#tnum'),tb=$('#tbar');
   if(tn)tn.textContent=Math.ceil(rem);
   const tr=$('#tring');if(tr&&S.dur){const C=2*Math.PI*19;tr.style.strokeDasharray=C;tr.style.strokeDashoffset=C*(1-Math.min(1,rem/S.dur));$('#ring').classList.toggle('low',rem<=5)}
-  const ni=$('#nextIn');if(ni)ni.textContent=S.n>=S.N?'':'السؤال التالي بعد '+Math.ceil(rem)+' ث';
+  if((S.ph==='q'||S.ph==='claim')&&rem>0&&rem<=5){const c=Math.ceil(rem);if(c!==lastTick){lastTick=c;SND.tick()}}else lastTick=-1;
+  const ni=$('#nextIn');if(ni)ni.textContent=S.n>=S.N?'':'التالي بعد '+Math.ceil(rem)+' ث';
   if(mode==='client'&&performance.now()>resendAt){
     const me=myIdx();
     if(S.ph==='q'&&choice>=0&&me>=0&&!S.ans[me]){send({k:'a',n:S.n,c:choice});resendAt=performance.now()+1800}
