@@ -1,12 +1,17 @@
 /* ================= UI + NETWORK ================= */
 const COLV=['var(--p1)','var(--p2)','var(--p3)','var(--p4)'], INKV=['var(--p1i)','var(--p2i)','var(--p3i)','var(--p4i)'];
-let ROOM=null,NR=null,mode='home',H=null,S=null,SJ='',lastN=-1,lastPh='',choice=-1,sel=null,lostHost=0,resendAt=0,roomCode='';
+let pickedMode=store.get('qm_mode','mix'),ROOM=null,NR=null,mode='home',H=null,S=null,SJ='',lastN=-1,lastPh='',choice=-1,sel=null,lostHost=0,resendAt=0,roomCode='';
 let vb=[0,0,GEO.w,GEO.h],MAP=null,scale=1;
 
 function h(t,a,...c){const e=document.createElement(t);if(a)for(const k in a){const v=a[k];if(k==='class')e.className=v;else if(k==='text')e.textContent=v;else if(k.slice(0,2)==='on')e.addEventListener(k.slice(2),v);else if(v===true)e.setAttribute(k,'');else if(v!==false&&v!=null)e.setAttribute(k,v)}c.flat().forEach(x=>{if(x==null||x===false)return;e.append(x&&x.nodeType?x:document.createTextNode(x))});return e}
 let toastT=0;
 function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3200)}
-function showScreens(...ids){['home','lobby','game','over','review'].forEach(s=>$('#'+s).hidden=!ids.includes(s));$('#btnHome').hidden=ids.includes('home')}
+function showScreens(...ids){['home','pick','lobby','game','over','review'].forEach(s=>$('#'+s).hidden=!ids.includes(s));$('#btnHome').hidden=ids.includes('home');$('#btnMenu').hidden=!(ids.includes('home')||ids.includes('pick'));closeMenu()}
+function openMenu(){$('#scrim').hidden=false;$('#drawer').hidden=false;$('#btnMenu').setAttribute('aria-expanded','true');$('#btnCloseMenu').focus()}
+function closeMenu(){if($('#drawer').hidden)return;$('#scrim').hidden=true;$('#drawer').hidden=true;$('#btnMenu').setAttribute('aria-expanded','false')}
+const savedN=()=>+store.get('qm_n',30)||30;
+function pickStep(b){$('#pickA').hidden=!!b;$('#pickB').hidden=!b;document.querySelectorAll('#modeCards .pc').forEach(c=>c.setAttribute('aria-pressed',c.dataset.v===pickedMode))}
+function applyTheme(v){const r=document.documentElement;if(v==='light'||v==='dark')r.setAttribute('data-theme',v);else r.removeAttribute('data-theme');document.querySelectorAll('#segTheme button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===v))}
 const myName=()=>cleanName($('#inName').value)||'لاعب';
 function myId(){return mode==='solo'?'me':(NR&&(NR.peers().find(p=>p.sameTab)||{}).peer)}
 function myIdx(){return S?S.pl.findIndex(p=>p.id===myId()&&!p.cpu):-1}
@@ -55,7 +60,7 @@ async function createRoom(){
   wire();mode='host';roomCode=code;
   try{await NR.presence({nm:myName(),role:'host',t:Date.now()})}catch(e){}
   newHost(code,s=>NR.emit('h2c',JSON.parse(s)).catch(()=>{}));
-  H.syncRoster();
+  H.syncRoster();H.setOpt('mode',pickedMode);H.setOpt('N',savedN());
 }
 async function joinRoom(){
   if(!ROOM||mode!=='home')return;
@@ -65,7 +70,7 @@ async function joinRoom(){
   try{NR=await ROOM.join('qm-'+code)}catch(e){toast('مقدرتش أدخل الغرفة، جرّب تاني.');return}
   wire();mode='client';roomCode=code;S=null;SJ='';
   try{await NR.presence({nm:myName(),role:'p',t:Date.now()})}catch(e){}
-  $('#btnJoin').disabled=true;toast('بندوّر على الغرفة...');
+  $('#btnJoin').disabled=true;closeMenu();toast('بندوّر على الغرفة...');
   const t0=Date.now();
   const iv=setInterval(()=>{
     if(S||mode!=='client'){clearInterval(iv);$('#btnJoin').disabled=false;return}
@@ -78,7 +83,7 @@ function startSolo(){
   store.set('qm_name',myName());
   mode='solo';roomCode='';
   newHost('solo',null,true);
-  H.syncRoster();H.addCpu(2);
+  H.syncRoster();H.addCpu(2);H.addCpu(2);H.setOpt('mode',pickedMode);H.setOpt('N',savedN());H.start();
 }
 async function leaveAll(){
   if(H){H.stop();H=null}
@@ -106,7 +111,7 @@ function buildMap(){
     const m=sv('g',{class:'mk'});
     const bd=sv('circle',{r:9,style:'fill:var(--surface);stroke:var(--ink);stroke-width:1.5'});
     const nm=sv('text',{y:4,'text-anchor':'middle','font-size':11,'font-weight':600,style:'fill:var(--ink);font-family:var(--fd)'});
-    const cs=sv('path',{d:'M-8 7V-3H-5V-6H-2V-3H2V-6H5V-3H8V7Z',style:'fill:var(--surface);stroke:var(--ink);stroke-width:1.4;stroke-linejoin:round',display:'none'});
+    const cs=sv('path',{d:'M0 -9C5 -2 8 1 8 4.5A8 8 0 0 1 -8 4.5C-8 1 -5 -2 0 -9Z',style:'fill:var(--surface);stroke:var(--ink);stroke-width:1.4;stroke-linejoin:round',display:'none'});
     const pg=sv('g',{});
     for(let k=0;k<4;k++)pg.append(sv('rect',{x:-11+k*6,y:10,width:5,height:5,rx:1,style:'fill:none;stroke:var(--ink);stroke-width:1.2',display:'none'}));
     m.append(bd,cs,nm,pg);gM.append(m);
@@ -178,7 +183,7 @@ function describe(id){
   const o=S&&S.ow[id];let s=tname(id);
   if(o===undefined)return s+': فاضية.';
   s+=': تابعة لـ '+pname(o);
-  if(S.pl[o].cs===id)s+=' (قلعته، ضربات '+(S.ht[id]||0)+' من 4)';
+  if(S.pl[o].cs===id)s+=' (منبعه، ضربات '+(S.ht[id]||0)+' من 4)';
   return s+'.';
 }
 function onTile(id){
@@ -192,6 +197,8 @@ function updateMap(){
     const M=MAP[id],o=S.ow[id];
     M.owned=o!==undefined;
     M.p.classList.toggle('own',M.owned);
+    if(M.po!==o&&M.po!==undefined&&M.owned){M.p.classList.remove('fl');void M.p.getBoundingClientRect();M.p.classList.add('fl')}
+    M.po=o;
     M.p.style.fill=M.owned?COLV[S.pl[o].ci]:'';
     M.p.classList.toggle('tgt',V.includes(id)&&sel!==id);
     M.p.classList.toggle('sel',sel===id);
@@ -221,13 +228,13 @@ function tilesCount(i){return Object.values(S.ow).filter(v=>v===i).length}
 function logText(e){
   const [k,a,t,x,y]=e;
   switch(k){
-    case 'cap':return `${pname(a)} ضمّ ${tname(t)}`;
-    case 'take':return `${pname(a)} أخد ${tname(t)} من ${pname(x)}`;
-    case 'def':return `${pname(x)} صدّ هجوم ${pname(a)} على ${tname(t)}`;
-    case 'hit':return `${pname(a)} ضرب قلعة ${pname(x)} في ${tname(t)} (${y} من 4)`;
-    case 'fall':return `${pname(a)} هدّ قلعة ${pname(x)} واستولى على ${tname(t)}`;
+    case 'cap':return `${pname(a)} غمر ${tname(t)} بالمعرفة`;
+    case 'take':return `${pname(a)} غمر ${tname(t)} وأخدها من ${pname(x)}`;
+    case 'def':return `${pname(x)} صدّ غمر ${pname(a)} لـ ${tname(t)}`;
+    case 'hit':return `${pname(a)} أصاب منبع ${pname(x)} في ${tname(t)} (${y} من 4)`;
+    case 'fall':return `${pname(a)} جفّف منبع ${pname(x)} وغمر ${tname(t)}`;
     case 'skip':return `${pname(a)} فوّت دوره`;
-    default:return `${pname(a)}: الهجوم على ${tname(t)} ما اتنفّذش`;
+    default:return `${pname(a)}: غمر ${tname(t)} ما اتنفّذش`;
   }
 }
 
@@ -271,9 +278,9 @@ function renderScore(){
     else if(S.rv&&S.ph!=='lobby')tag=S.rv.ch[i]===S.rv.ci?'صح ✓':(S.rv.ch[i]<0?'ما جاوبش':'غلط ✗');
     box.append(h('div',{class:'sc'+(i===me?' me':'')+(p.out?' out':'')},
       h('div',{class:'nm'},dot(i),h('span',{class:'t',text:p.nm+(i===me?' (أنت)':'')})),
-      h('div',{class:'st'},h('span',{class:'num',text:tilesCount(i)+' رقعة · '+p.ok+' صح'}),h('span',{text:p.cpu?'كمبيوتر '+LVL[p.cpu]:''})),
+      h('div',{class:'st'},h('span',{class:'num',text:tilesCount(i)+' محافظة · '+p.ok+' صح'}),h('span',{text:p.cpu?'كمبيوتر '+LVL[p.cpu]:''})),
       h('div',{class:'st'},
-        castle?h('span',{class:'pips','aria-label':'ضربات القلعة '+(S.ht[p.cs]||0)+' من 4'},[0,1,2,3].map(k=>h('i',{class:k<(S.ht[p.cs]||0)?'f':''})),h('span',{style:'margin-inline-start:6px',text:'قلعة'})):h('span',{text:p.out?'القلعة وقعت':''}),
+        castle?h('span',{class:'pips','aria-label':'ضربات المنبع '+(S.ht[p.cs]||0)+' من 4'},[0,1,2,3].map(k=>h('i',{class:k<(S.ht[p.cs]||0)?'f':''})),h('span',{style:'margin-inline-start:6px',text:'منبع'})):h('span',{text:p.out?'المنبع جفّ':''}),
         h('span',{text:tag}))));
   });
 }
@@ -306,7 +313,7 @@ function claimNow(){
 function tgtInfo(t){
   const o=S.ow[t];
   if(o===undefined)return 'فاضية';
-  return S.pl[o].cs===t?`قلعة ${pname(o)} · ضربات ${S.ht[t]||0}/4`:'تابعة لـ '+pname(o);
+  return S.pl[o].cs===t?`منبع ${pname(o)} · ضربات ${S.ht[t]||0}/4`:'تابعة لـ '+pname(o);
 }
 function renderPanel(){
   const box=$('#panel');box.textContent='';
@@ -323,7 +330,7 @@ function renderPanel(){
   if(S.ph==='q'){
     box.append(h('div',{class:'opts'},optButtons(mine&&choice<0)));
     const need=S.pl.filter(p=>!p.out&&!p.gone).length,got=S.ans.filter(Boolean).length;
-    box.append(h('div',{class:'hint'},me<0?'أنت متفرج في الغرفة دي.':!mine?'مش بتشارك في الجولة دي.':choice>=0?`تم تثبيت إجابتك. جاوب ${got} من ${need}.`:'اختار إجابتك. كل ما جاوبت أسرع كل ما أخدت أولوية في اختيار الرقعة.'));
+    box.append(h('div',{class:'hint'},me<0?'أنت متفرج في الغرفة دي.':!mine?'مش بتشارك في الجولة دي.':choice>=0?`تم تثبيت إجابتك. جاوب ${got} من ${need}.`:'اختار إجابتك. كل ما جاوبت أسرع كل ما أخدت أولوية في اختيار المحافظة.'));
     return;
   }
   box.append(h('div',{class:'opts'},optButtons(false)));
@@ -331,13 +338,13 @@ function renderPanel(){
     const elig=S.cl.el,done=S.cl.dn;
     if(canClaim()){
       const V=validFor(me);
-      box.append(h('div',{class:'hint',text:'إجابتك صح. اختار رقعة تضمها أو تهاجمها، من الخريطة أو من القايمة دي.'}));
+      box.append(h('div',{class:'hint',text:'إجابتك صح. اختار المحافظة اللي تغمرها بالمعرفة، من الخريطة أو من القايمة دي.'}));
       box.append(h('div',{class:'tgts'},V.map(t=>h('button',{class:'tg','aria-pressed':sel===t?'true':'false',onclick:()=>{sel=t;$('#cap').textContent=describe(t);renderPanel();updateMap()}},tname(t),h('small',{text:tgtInfo(t)})))));
-      box.append(h('button',{class:'btn',disabled:!sel,onclick:claimNow,text:sel?'ثبّت: '+tname(sel):'اختار رقعة الأول'}));
+      box.append(h('button',{class:'btn',disabled:!sel,onclick:claimNow,text:sel?'ثبّت: '+tname(sel):'اختار محافظة الأول'}));
     }else if(me>=0&&elig.includes(me)){
       box.append(h('div',{class:'hint',text:'تم تثبيت اختيارك. بانتظار الباقي.'}));
     }else{
-      box.append(h('div',{class:'hint',text:me>=0&&S.rv.ch[me]>=0&&S.rv.ch[me]!==S.rv.ci?'إجابتك مش صح، مفيش رقعة المرة دي.':'اللي جاوبوا صح بيختاروا رقعتهم دلوقتي.'}));
+      box.append(h('div',{class:'hint',text:me>=0&&S.rv.ch[me]>=0&&S.rv.ch[me]!==S.rv.ci?'إجابتك مش صح، مفيش غمر المرة دي.':'اللي جاوبوا صح بيختاروا محافظتهم دلوقتي.'}));
     }
     box.append(h('div',{class:'small muted',text:'بيختاروا: '+elig.map(i=>pname(i)+(done.includes(i)?' ✓':'')).join('، ')}));
     return;
@@ -354,8 +361,8 @@ function renderOver(){
   $('#ovTitle').textContent=S.win>=0?'الفايز: '+pname(S.win):'انتهت اللعبة';
   const box=$('#ovRank');box.textContent='';
   r.forEach((x,k)=>box.append(h('div',{class:'rk'+(k===0?' win':'')},h('div',{class:'pos num',text:String(k+1)}),dot(x.i),
-    h('div',{style:'flex:1;min-width:0'},h('div',{style:'font-weight:600',text:pname(x.i)+(x.i===myIdx()?' (أنت)':'')}),h('div',{class:'small muted num',text:`${x.t} رقعة · ${x.ok} إجابة صح`+(x.out?' · قلعته وقعت':'')})))));
-  $('#ovNote').textContent=alive<=1?'اللعبة خلصت لأن آخر قلعة فضلت واقفة.':`اللعبة خلصت بعد ${S.N} سؤال، والترتيب بعدد الرقع ثم عدد الإجابات الصح.`;
+    h('div',{style:'flex:1;min-width:0'},h('div',{style:'font-weight:600',text:pname(x.i)+(x.i===myIdx()?' (أنت)':'')}),h('div',{class:'small muted num',text:`${x.t} محافظة · ${x.ok} إجابة صح`+(x.out?' · منبعه جفّ':'')})))));
+  $('#ovNote').textContent=alive<=1?'اللعبة خلصت لأن آخر منبع فضل شغال.':`اللعبة خلصت بعد ${S.N} سؤال، والترتيب بعدد المحافظات ثم عدد الإجابات الصح.`;
   $('#btnAgain').hidden=!isHost();
   if(!isHost())$('#ovNote').textContent+=' في انتظار صاحب الغرفة يبدأ لعبة جديدة.';
 }
@@ -420,19 +427,29 @@ function drawMini(){
 }
 function netNote(){
   const n=$('#netNote');
-  if(ROOM){n.hidden=true;$('#btnCreate').disabled=false;$('#btnJoin').disabled=false;$('#inCode').disabled=false;return}
-  n.hidden=false;
-  if(window.QM_STANDALONE){n.textContent='اللعب الأونلاين مش متفعّل لأن إعداد Firebase ناقص (راجع ملف README). اللعب ضد الكمبيوتر شغال.';$('#btnCreate').disabled=true;$('#btnJoin').disabled=true;$('#inCode').disabled=true;return}
-  n.textContent='اللعب الجماعي بين الأجهزة مش متاح في العرض ده. افتح الصفحة من حسابك وشارك الرابط مع أصحابك بصلاحية «تفاعل» (Contributor) عشان يقدروا يدخلوا الغرفة. اللعب ضد الكمبيوتر شغال دلوقتي.';
+  const j=$('#joinNote');
+  if(ROOM){n.hidden=true;j.hidden=true;$('#btnCreate').disabled=false;$('#btnJoin').disabled=false;$('#inCode').disabled=false;return}
+  n.hidden=false;j.hidden=false;
+  const msg=window.QM_STANDALONE?'اللعب الأونلاين مش متفعّل لأن إعداد Firebase ناقص (راجع ملف README). اللعب ضد الكمبيوتر شغال.':'اللعب الجماعي بين الأجهزة مش متاح في العرض ده. افتح الصفحة من حسابك وشارك الرابط مع أصحابك بصلاحية «تفاعل» (Contributor) عشان يقدروا يدخلوا الغرفة. اللعب ضد الكمبيوتر شغال دلوقتي.';
+  n.textContent=msg;j.textContent=msg;
   $('#btnCreate').disabled=true;$('#btnJoin').disabled=true;$('#inCode').disabled=true;
 }
 function init(){
   drawMini();
   $('#inName').value=store.get('qm_name','');
   $('#btnSolo').onclick=startSolo;$('#btnCreate').onclick=createRoom;$('#btnJoin').onclick=joinRoom;
+  $('#btnPlay').onclick=()=>{store.set('qm_name',myName());showScreens('pick');pickStep(false)};
+  $('#inName').addEventListener('keydown',e=>{if(e.key==='Enter')$('#btnPlay').click()});
+  document.querySelectorAll('#modeCards .pc').forEach(c=>c.onclick=()=>{pickedMode=c.dataset.v;store.set('qm_mode',pickedMode);pickStep(true)});
+  $('#pickBack').onclick=()=>pickStep(false);
+  $('#btnMenu').onclick=openMenu;$('#btnCloseMenu').onclick=closeMenu;$('#scrim').onclick=closeMenu;
+  addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
+  document.querySelectorAll('#segN0 button').forEach(b=>{b.setAttribute('aria-pressed',+b.dataset.v===savedN());b.onclick=()=>{store.set('qm_n',+b.dataset.v);document.querySelectorAll('#segN0 button').forEach(x=>x.setAttribute('aria-pressed',x===b))}});
+  document.querySelectorAll('#segTheme button').forEach(b=>b.onclick=()=>{store.set('qm_theme',b.dataset.v);applyTheme(b.dataset.v)});
+  applyTheme(store.get('qm_theme','auto'));
   $('#inCode').addEventListener('keydown',e=>{if(e.key==='Enter')joinRoom()});
   $('#btnHome').onclick=leaveAll;$('#btnLeave').onclick=leaveAll;$('#btnOverHome').onclick=leaveAll;
-  $('#btnAgain').onclick=()=>{if(H)H.again()};
+  $('#btnAgain').onclick=()=>{if(H){H.again();if(mode==='solo')H.start()}};
   $('#btnStart').onclick=()=>{if(H)H.start()};
   $('#btnCopy').onclick=async()=>{try{await navigator.clipboard.writeText(roomCode.toUpperCase());toast('تم نسخ الكود.')}catch(e){toast('الكود: '+roomCode.toUpperCase())}};
   document.querySelectorAll('#segMode button').forEach(b=>b.onclick=()=>H&&H.setOpt('mode',b.dataset.v));

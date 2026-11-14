@@ -1,4 +1,4 @@
-<title>قلاع المعمل</title>
+<title>غمر المعرفة</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Reem+Kufi:wght@600&display=swap">
 <style>
@@ -138,50 +138,112 @@ select{font:inherit;color:var(--ink);background:var(--bg);border:1.5px solid var
 .rq li.c{background:color-mix(in srgb,var(--ok) 18%,transparent);font-weight:600}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--btn);color:var(--btnink);padding:10px 16px;border-radius:10px;z-index:20;max-width:90vw;box-shadow:var(--shadow)}
 
+.btn.big{min-height:60px;font-size:1.25rem;font-family:var(--fd);border-radius:14px;width:100%}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.pc{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:start;background:var(--bg);border:1.5px solid var(--ink);border-radius:14px;padding:18px 16px;min-height:112px;transition:transform .12s,background .12s}
+.pc b{font-family:var(--fd);font-size:1.3rem;font-weight:600}
+.pc span{color:var(--muted);font-size:.92rem;line-height:1.5}
+.pc:hover:not([disabled]){background:var(--btn);color:var(--btnink)}
+.pc:hover:not([disabled]) span{color:inherit;opacity:.85}
+.pc:active:not([disabled]){transform:scale(.98)}
+.pc[disabled]{opacity:.45;cursor:not-allowed}
+#pickB .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+#scrim{position:fixed;inset:0;background:rgba(10,26,39,.5);z-index:30}
+#drawer{position:fixed;top:0;bottom:0;inset-inline-start:0;width:min(340px,90vw);background:var(--surface);border-inline-end:1px solid var(--line);z-index:31;padding:16px;display:flex;flex-direction:column;gap:18px;overflow-y:auto;box-shadow:var(--shadow);padding-top:max(16px,env(safe-area-inset-top,0px))}
+#drawer>.btn{width:100%}
+details.how summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center}
+details.how p{margin:.2rem 0 0}
+@keyframes flood{0%{fill-opacity:.1;stroke-width:5}100%{fill-opacity:1}}
+.tp.fl{animation:flood .9s ease-out}
 @media (max-width:860px){
   .hero,.lobby,.game{grid-template-columns:1fr}
+  .cards,#pickB .cards{grid-template-columns:1fr}
+  .pc{min-height:0}
   .qtext{font-size:1.1rem}
 }
 @media (min-width:640px){.opts{grid-template-columns:1fr 1fr}}
 @media (max-width:860px) and (min-width:640px){.opts{grid-template-columns:1fr 1fr}}
-@media (prefers-reduced-motion:reduce){.tp.tgt{animation:none}.bar i,.tp{transition:none}}
+@media (prefers-reduced-motion:reduce){.tp.tgt,.tp.fl{animation:none}.bar i,.tp{transition:none}}
 </style>
 
 <div class="app">
   <header class="top">
-    <div class="brand" id="brand">
-      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 28V10h4v3h3v-3h4v3h3v-3h4v3h3v-3h4v18z" fill="currentColor"/><path d="M13 28v-7a3 3 0 0 1 6 0v7z" fill="var(--bg)"/></svg>
-      <span>قلاع المعمل</span>
+    <div class="row" style="flex-wrap:nowrap">
+      <button class="btn ghost sm" id="btnMenu" aria-label="القائمة" aria-expanded="false" aria-controls="drawer" style="min-width:44px;padding:8px 10px">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg>
+      </button>
+      <div class="brand" id="brand">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C21 11 25 15 25 20a9 9 0 0 1-18 0c0-5 4-9 9-17z" fill="currentColor"/><path d="M12 21a4 4 0 0 0 4 4" stroke="var(--bg)" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+        <span>غمر المعرفة</span>
+      </div>
     </div>
     <button class="btn ghost sm" id="btnHome" hidden>الرئيسية</button>
   </header>
+
+  <div id="scrim" hidden></div>
+  <aside id="drawer" hidden aria-label="القائمة">
+    <div class="qhead"><h3>القائمة</h3><button class="btn ghost sm" id="btnCloseMenu" aria-label="إغلاق القائمة">✕</button></div>
+    <div class="field">
+      <label for="inCode">عندك كود غرفة؟</label>
+      <div class="row" style="flex-wrap:nowrap">
+        <input type="text" id="inCode" maxlength="5" autocomplete="off" inputmode="text" dir="ltr" placeholder="ABCDE" style="font-family:var(--fm);letter-spacing:.15em;text-transform:uppercase">
+        <button class="btn" id="btnJoin" style="flex:none">ادخل</button>
+      </div>
+      <div class="notice" id="joinNote" hidden style="margin-top:8px"></div>
+    </div>
+    <div class="field"><label>عدد الأسئلة</label>
+      <div class="seg" id="segN0" role="group">
+        <button data-v="20" aria-pressed="false">20</button>
+        <button data-v="30" aria-pressed="true">30</button>
+        <button data-v="40" aria-pressed="false">40</button>
+      </div></div>
+    <div class="field"><label>شكل الصفحة</label>
+      <div class="seg" id="segTheme" role="group">
+        <button data-v="auto" aria-pressed="true">تلقائي</button>
+        <button data-v="light" aria-pressed="false">فاتح</button>
+        <button data-v="dark" aria-pressed="false">داكن</button>
+      </div></div>
+    <details class="how">
+      <summary>إزاي تلعب؟</summary>
+      <p class="muted small">كل سؤال عليه مؤقت. اللي يجاوب صح يغمر محافظة بجانب أرضه بالمعرفة. لو المحافظة تابعة لمنافس، الغمر بينجح بس لو جاوب غلط أو جاوب أبطأ منك. منبع كل لاعب بيجف بعد 4 غمرات ناجحة عليه.</p>
+    </details>
+    <button class="btn ghost" id="btnReview">مراجعة أسئلة المعمل فنيًا</button>
+  </aside>
 
   <section id="home" class="stack">
     <div class="hero">
       <div class="card stack">
         <div>
-          <h2>اغزُ محافظات مصر بمعلوماتك</h2>
-          <p class="muted">أسئلة تربة وخرسانة وأسفلت وركام، ومعاها ثقافة عامة وحساب. اللي يجاوب صح يضم رقعة جديدة أو يهاجم محافظة جاره، وأربع هجمات ناجحة تهدّ القلعة.</p>
+          <h2>اغمرها بالمعرفة</h2>
+          <p class="muted">أسئلة معمل وثقافة عامة وحساب، وخريطة مصر ملكك لو جاوبت صح.</p>
         </div>
         <div class="field">
           <label for="inName">اسمك في اللعبة</label>
           <input type="text" id="inName" maxlength="18" autocomplete="off" placeholder="مثلًا: م. أحمد">
         </div>
-        <div class="row">
-          <button class="btn" id="btnSolo">العب ضد الكمبيوتر</button>
-          <button class="btn ghost" id="btnCreate">افتح غرفة</button>
-        </div>
-        <div class="field">
-          <label for="inCode">عندك كود غرفة؟</label>
-          <div class="row" style="flex-wrap:nowrap">
-            <input type="text" id="inCode" maxlength="5" autocomplete="off" inputmode="text" dir="ltr" placeholder="ABCDE" style="font-family:var(--fm);letter-spacing:.15em;text-transform:uppercase">
-            <button class="btn ghost" id="btnJoin" style="flex:none">ادخل</button>
-          </div>
-        </div>
-        <div class="notice" id="netNote" hidden></div>
-        <div class="row"><button class="btn ghost sm" id="btnReview">مراجعة أسئلة المعمل فنيًا</button></div>
+        <button class="btn big" id="btnPlay">ابدأ اللعب</button>
       </div>
       <div class="minimap" aria-hidden="true"><svg id="miniSvg" viewBox="0 0 10 10"></svg></div>
+    </div>
+  </section>
+
+  <section id="pick" hidden class="stack">
+    <div class="card stack" id="pickA">
+      <h2>اختار نوع الأسئلة</h2>
+      <div class="cards" id="modeCards">
+        <button class="pc" data-v="lab"><b>معمل</b><span>تربة وخرسانة وأسفلت وركام وحسابات</span></button>
+        <button class="pc" data-v="gen"><b>ثقافة عامة</b><span>تاريخ وفن وجغرافيا وعلوم ورياضة وحساب</span></button>
+        <button class="pc" data-v="mix"><b>مختلط</b><span>من الاتنين مع بعض</span></button>
+      </div>
+    </div>
+    <div class="card stack" id="pickB" hidden>
+      <h2>تلعب مع مين؟</h2>
+      <div class="cards">
+        <button class="pc" id="btnSolo"><b>ضد الكمبيوتر</b><span>بتبدأ على طول</span></button>
+        <button class="pc" id="btnCreate"><b>مع أصحابك</b><span>بتفتح غرفة وتبعت الكود لحد 3 لاعبين</span></button>
+      </div>
+      <div class="notice" id="netNote" hidden></div>
+      <div class="row"><button class="btn ghost sm" id="pickBack">رجوع</button></div>
     </div>
   </section>
 
@@ -210,7 +272,7 @@ select{font:inherit;color:var(--ink);background:var(--bg);border:1.5px solid var
             <button data-v="30" aria-pressed="true">30</button>
             <button data-v="40" aria-pressed="false">40</button>
           </div></div>
-        <div class="muted small" id="lbRules">كل سؤال عليه مؤقت. اللي يجاوب صح يختار رقعة بجانب أرضه ويضمها. لو الرقعة تابعة لمنافس، الهجوم بينجح بس لو جاوب غلط أو جاوب أبطأ منك. القلعة بتقع بعد 4 هجمات ناجحة.</div>
+        <div class="muted small" id="lbRules">كل سؤال عليه مؤقت. اللي يجاوب صح يختار محافظة بجانب أرضه ويغمرها بالمعرفة. لو المحافظة تابعة لمنافس، الغمر بينجح بس لو جاوب غلط أو جاوب أبطأ منك. المنبع بيجف بعد 4 غمرات ناجحة عليه.</div>
         <div class="row">
           <button class="btn" id="btnStart">ابدأ اللعب</button>
           <button class="btn ghost" id="btnLeave">خروج</button>
