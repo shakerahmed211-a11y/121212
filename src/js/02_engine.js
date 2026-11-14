@@ -8,8 +8,8 @@ const CPU_P=[0,.5,.7,.88], CPU_T=[null,[8,16],[5,11],[3,8]];
 function cleanName(s){return String(s||'').replace(/[\u0000-\u001f​-‏‪-‮⁦-⁩]/g,'').trim().slice(0,18)}
 
 function makeHost(code,emit,onLocal,getPeers,meFn){
-  const st={ph:'lobby',code,mode:'mix',N:30,n:0,pl:[],ow:{},ht:{},q:null,ans:[],cl:null,rv:null,rem:0,dur:0,win:-1,hd:[],hf:{},ls:0,nx:[]};
-  const hs={used:new Set(),qa:-1,qStart:0,ans:{},claims:{},tm:null,cpuT:[],dl:0,hb:null,cpuSeq:0,pen:{},cpuQ:[],first:false,lc:false};
+  const st={ph:'lobby',code,mode:'mix',N:15,n:0,pl:[],ow:{},ht:{},q:null,ans:[],cl:null,rv:null,rem:0,dur:0,win:-1,hd:[],hf:{},ls:0,nx:[],gd:0,rx:null};
+  const hs={used:new Set(),qa:-1,qStart:0,ans:{},claims:{},tm:null,cpuT:[],dl:0,hb:null,cpuSeq:0,rxS:0,rxT:{},pen:{},cpuQ:[],first:false,lc:false};
 
   function clearT(){clearTimeout(hs.tm);hs.cpuT.forEach(clearTimeout);hs.cpuT=[]}
   function alive(){return st.pl.map((p,i)=>i).filter(i=>!st.pl[i].out)}
@@ -40,8 +40,8 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
     humans.forEach(h=>{const o=old.get(h.id);if(o&&!used.has(o.ci)){h.ci=o.ci;used.add(o.ci)}});
     keep.forEach(c=>{if(!used.has(c.ci)){used.add(c.ci)}else c.ci=-1});
     const take=()=>{for(let c=0;c<4;c++)if(!used.has(c)){used.add(c);return c}return 0};
-    humans.forEach(h=>{if(h.ci==null)h.ci=take();next.push({id:h.id,nm:h.nm,ci:h.ci,cpu:0,out:0,gone:0,ok:0,pts:0,h:FIFTY,cs:''})});
-    keep.forEach(c=>{if(c.ci<0)c.ci=take();next.push({id:c.id,nm:c.nm,ci:c.ci,cpu:c.cpu,out:0,gone:0,ok:0,pts:0,h:FIFTY,cs:''})});
+    humans.forEach(h=>{if(h.ci==null)h.ci=take();next.push({id:h.id,nm:h.nm,ci:h.ci,cpu:0,out:0,gone:0,ok:0,pts:0,cb:0,mc:0,h:FIFTY,cs:''})});
+    keep.forEach(c=>{if(c.ci<0)c.ci=take();next.push({id:c.id,nm:c.nm,ci:c.ci,cpu:c.cpu,out:0,gone:0,ok:0,pts:0,cb:0,mc:0,h:FIFTY,cs:''})});
     st.pl=next;
     broadcast();
   }
@@ -49,18 +49,18 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
     if(st.ph!=='lobby'||st.pl.length>=4)return;
     hs.cpuSeq++;
     const used=new Set(st.pl.map(p=>p.ci));let ci=0;for(let c=0;c<4;c++)if(!used.has(c)){ci=c;break}
-    st.pl.push({id:'cpu'+hs.cpuSeq,nm:'كمبيوتر '+(st.pl.filter(p=>p.cpu).length+1),ci,cpu:level,out:0,gone:0,ok:0,pts:0,h:FIFTY,cs:''});
+    st.pl.push({id:'cpu'+hs.cpuSeq,nm:'كمبيوتر '+(st.pl.filter(p=>p.cpu).length+1),ci,cpu:level,out:0,gone:0,ok:0,pts:0,cb:0,mc:0,h:FIFTY,cs:''});
     broadcast();
   }
   function removeCpu(idx){ if(st.ph==='lobby'&&st.pl[idx]&&st.pl[idx].cpu){st.pl.splice(idx,1);broadcast()} }
-  function setOpt(k,v){ if(st.ph!=='lobby')return; if(k==='mode'&&['lab','gen','mix'].includes(v))st.mode=v; if(k==='N'&&[20,30,40].includes(+v))st.N=+v; broadcast(); }
+  function setOpt(k,v){ if(st.ph!=='lobby')return; if(k==='mode'&&['lab','gen','mix'].includes(v))st.mode=v; if(k==='N'&&[10,15,20,30,40].includes(+v))st.N=+v; broadcast(); }
 
   /* ----- game ----- */
   function start(){
     if(st.ph!=='lobby'||st.pl.length<2)return false;
     st.ow={};st.ht={};st.n=0;st.win=-1;hs.used.clear();
     const spots=shuf(STARTS[st.pl.length]);
-    st.pl.forEach((p,i)=>{p.out=0;p.ok=0;p.pts=0;p.h=FIFTY;p.gone=0;p.cs=spots[i];st.ow[spots[i]]=i});
+    st.pl.forEach((p,i)=>{p.out=0;p.ok=0;p.pts=0;p.cb=0;p.mc=0;p.h=FIFTY;p.gone=0;p.cs=spots[i];st.ow[spots[i]]=i});
     nextQ();return true;
   }
   function nextQ(){
@@ -88,7 +88,7 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
   function startQ(){
     const q=choose();
     hs.qa=q.a;hs.qStart=Date.now();hs.ans={};hs.claims={};hs.pen={};hs.cpuQ=[];hs.first=false;hs.lc=false;
-    st.n++;st.ph='q';st.ans=[];st.cl=null;st.rv=null;st.hd=[];st.hf={};st.ls=0;st.nx=[];
+    st.n++;st.ph='q';st.ans=[];st.cl=null;st.rv=null;st.hd=[];st.hf={};st.ls=0;st.nx=[];st.gd=(st.n%7===0&&st.n<st.N)?1:0;
     st.q={k:q.k,c:q.c,t:q.t,o:q.o,l:q.l,s:q.s,ltr:q.ltr,dur:q.dur};
     st.dur=q.dur;hs.dl=Date.now()+q.dur*1000;
     hs.tm=setTimeout(endQ,q.dur*1000);
@@ -149,20 +149,21 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
     if(st.ph!=='q')return;
     clearT();
     const ci=hs.qa,ch=[],tm=[];
-    st.pl.forEach((p,i)=>{const a=hs.ans[i];ch[i]=a?a.c:-1;tm[i]=a?+((a.t/1000)+(hs.pen[i]?PEN_SEC:0)).toFixed(1):-1;if(a&&a.c===ci&&!p.out)p.ok++});
+    st.pl.forEach((p,i)=>{const a=hs.ans[i];ch[i]=a?a.c:-1;tm[i]=a?+((a.t/1000)+(hs.pen[i]?PEN_SEC:0)).toFixed(1):-1;
+      if(!p.out){if(a&&a.c===ci){p.ok++;p.cb=(p.cb||0)+1;if(p.cb>(p.mc||0))p.mc=p.cb}else p.cb=0}});
     // points by speed: the fastest correct answer earns the most
     const pt=st.pl.map(()=>0);
-    st.pl.map((p,i)=>i).filter(i=>ch[i]===ci&&!st.pl[i].out).sort((a,b)=>tm[a]-tm[b]).forEach((i,r)=>{pt[i]=PTS[Math.min(r,PTS.length-1)];st.pl[i].pts+=pt[i]});
+    st.pl.map((p,i)=>i).filter(i=>ch[i]===ci&&!st.pl[i].out).sort((a,b)=>tm[a]-tm[b]).forEach((i,r)=>{pt[i]=PTS[Math.min(r,PTS.length-1)]*(1+(st.gd?1:0)+((st.pl[i].cb||0)>=3?1:0));st.pl[i].pts+=pt[i]});
     const el=alive().filter(i=>!st.pl[i].gone&&ch[i]===ci&&valid(i).length).sort((a,b)=>tm[a]-tm[b]);
     st.rv={ci,ch,tm,pt,log:[],s:st.q.s||''};
     if(!el.length){st.cl=null;finishRound();return}
     st.cl={el,dn:[]};hs.claims={};st.ph='claim';st.dur=CLAIM_SEC;hs.dl=Date.now()+CLAIM_SEC*1000;
     hs.tm=setTimeout(resolve,CLAIM_SEC*1000);
-    el.forEach(i=>{ if(st.pl[i].cpu) hs.cpuT.push(setTimeout(()=>claim(i,cpuTarget(i)),R(1200,3500))) });
+    el.forEach(i=>{ if(st.pl[i].cpu) hs.cpuT.push(setTimeout(()=>{const t1=cpuTarget(i),arr=[t1];if(st.gd&&t1){const t2=cpuTarget(i,t1);if(t2)arr.push(t2)}claim(i,arr)},R(1200,3500))) });
     broadcast();
   }
-  function cpuTarget(i){
-    const L=st.pl[i].cpu,V=valid(i),{ch,tm,ci}=st.rv;let best=null,bs=-1e9;
+  function cpuTarget(i,ex){
+    const L=st.pl[i].cpu,V=valid(i).filter(x=>x!==ex),{ch,tm,ci}=st.rv;let best=null,bs=-1e9;
     for(const t of V){
       const e=st.ow[t],nb=GEO.t[t].adj;let s=Math.random()*(L===1?6:L===2?3:1.2);
       const mine=nb.filter(a=>st.ow[a]===i).length;
@@ -176,8 +177,10 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
     return best;
   }
   function claim(i,t){
-    if(st.ph!=='claim'||!st.cl||!st.cl.el.includes(i)||st.cl.dn.includes(i)||!t||!valid(i).includes(t))return;
-    hs.claims[i]=t;st.cl.dn.push(i);
+    if(st.ph!=='claim'||!st.cl||!st.cl.el.includes(i)||st.cl.dn.includes(i)||!t)return;
+    const arr=[...new Set(Array.isArray(t)?t:[t])].slice(0,st.gd?2:1),V=valid(i);
+    if(!arr.length||!arr.every(x=>typeof x==='string'&&V.includes(x)))return;
+    hs.claims[i]=arr;st.cl.dn.push(i);
     if(st.cl.dn.length>=st.cl.el.length){clearTimeout(hs.tm);resolve();return}
     broadcast();
   }
@@ -187,22 +190,28 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
     const {ch,tm,ci}=st.rv,log=st.rv.log;
     const order=st.cl.el.slice();
     order.forEach(a=>{
-      const t=hs.claims[a];
-      if(!t){log.push(['skip',a]);return}
-      if(st.pl[a].out)return;
-      if(!valid(a).includes(t)){log.push(['inv',a,t]);return}
-      const e=st.ow[t];
-      if(e===undefined){st.ow[t]=a;log.push(['cap',a,t]);return}
-      const defOk=ch[e]===ci&&!st.pl[e].out;
-      if(defOk&&tm[e]<tm[a]){log.push(['def',a,t,e]);return}
-      if(st.pl[e].cs===t){
-        st.ht[t]=(st.ht[t]||0)+1;
-        if(st.ht[t]>=CASTLE_HITS){
-          delete st.ht[t];st.ow[t]=a;st.pl[e].out=1;
-          Object.keys(st.ow).forEach(k=>{if(st.ow[k]===e)delete st.ow[k]});
-          log.push(['fall',a,t,e]);
-        }else log.push(['hit',a,t,e,st.ht[t]]);
-      }else{st.ow[t]=a;log.push(['take',a,t,e])}
+      const list=hs.claims[a];
+      if(!list||!list.length){log.push(['skip',a]);return}
+      list.forEach(t=>{
+        if(st.pl[a].out)return;
+        if(!valid(a).includes(t)){log.push(['inv',a,t]);return}
+        const e=st.ow[t];
+        if(e===undefined){st.ow[t]=a;log.push(['cap',a,t]);cpuReact(a,[1,0]);return}
+        const defOk=ch[e]===ci&&!st.pl[e].out;
+        if(defOk&&tm[e]<tm[a]){log.push(['def',a,t,e]);cpuReact(e,[2]);return}
+        if(st.pl[e].cs===t){
+          st.ht[t]=(st.ht[t]||0)+1;
+          if(st.ht[t]>=CASTLE_HITS){
+            delete st.ht[t];st.ow[t]=a;st.pl[e].out=1;
+            Object.keys(st.ow).forEach(k=>{if(st.ow[k]===e)delete st.ow[k]});
+            log.push(['fall',a,t,e]);cpuReact(a,[1]);cpuReact(e,[3]);
+          }else{
+            log.push(['hit',a,t,e,st.ht[t]]);
+            // a player whose source is nearly dry gets one extra 50/50 hint
+            if(st.ht[t]===CASTLE_HITS-1&&(st.pl[e].h||0)<3){st.pl[e].h=(st.pl[e].h||0)+1;log.push(['aid',e])}
+          }
+        }else{st.ow[t]=a;log.push(['take',a,t,e]);cpuReact(a,[1,0])}
+      });
     });
     finishRound();
   }
@@ -225,7 +234,7 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
   function again(){
     clearT();
     st.ph='lobby';st.ow={};st.ht={};st.n=0;st.q=null;st.rv=null;st.cl=null;st.win=-1;st.dur=0;hs.dl=0;
-    st.pl=st.pl.map(p=>({...p,out:0,gone:0,ok:0,pts:0,h:FIFTY,cs:''}));st.hd=[];st.hf={};st.ls=0;st.nx=[];
+    st.pl=st.pl.map(p=>({...p,out:0,gone:0,ok:0,pts:0,cb:0,mc:0,h:FIFTY,cs:''}));st.hd=[];st.hf={};st.ls=0;st.nx=[];st.gd=0;st.rx=null;
     syncRoster();
   }
   function peerLeft(id){
@@ -246,8 +255,15 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
     if(m.k==='a'&&m.n===st.n)answer(i,m.c);
     else if(m.k==='c'&&m.n===st.n&&typeof m.t==='string')claim(i,m.t);
     else if(m.k==='f'&&m.n===st.n)fifty(i);
+    else if(m.k==='r')react(i,m.e|0);
     else if(m.k==='x'&&m.n===st.n&&st.ph==='rev'&&!st.nx.includes(i)){st.nx.push(i);if(allReady()){clearTimeout(hs.tm);nextQ()}else broadcast()}
   }
+  function react(i,e){
+    if(!(e>=0&&e<4)||!st.pl[i])return;
+    const now=Date.now();if(now-(hs.rxT[i]||0)<1200)return;
+    hs.rxT[i]=now;st.rx={i,e,s:++hs.rxS};broadcast();
+  }
+  function cpuReact(i,opts){if(st.pl[i]&&st.pl[i].cpu&&Math.random()<.4)hs.cpuT.push(setTimeout(()=>react(i,pick(opts)),R(400,1800)))}
   function allReady(){const hu=active().filter(k=>!st.pl[k].cpu);return hu.length>0&&hu.every(k=>st.nx.includes(k))}
   function stop(){clearT();clearInterval(hs.hb)}
   hs.hb=setInterval(()=>{ if(st.ph!=='over'||true)broadcast() },4000);

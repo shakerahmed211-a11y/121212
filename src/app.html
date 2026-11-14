@@ -105,6 +105,25 @@ select{font:inherit;color:var(--ink);background:var(--bg);border:1.5px solid var
 .opts{display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px}
 .opt{display:flex;align-items:center;gap:10px;text-align:start;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:10px 12px;min-height:60px;width:100%;font-size:1.04rem;box-shadow:0 3px 0 rgba(0,0,0,.16);transition:transform .08s}
 .opt:active:not([disabled]){transform:translateY(2px)}
+.rxbar{display:flex;gap:8px;margin-top:10px}
+.rxbar button{flex:1;min-height:44px;font-size:1.3rem;background:var(--surface);border:1.5px solid var(--line);border-radius:12px;transition:transform .1s}
+.rxbar button:active{transform:scale(.9)}
+.rxlayer{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.rxlayer .fx{position:absolute;bottom:8px;display:flex;align-items:center;gap:4px;font-size:2rem;animation:rise 2.2s ease-out forwards}
+.rxlayer .fx i{width:14px;height:14px;border-radius:50%;border:2px solid var(--ink);display:block}
+@keyframes rise{0%{transform:translateY(0) scale(.6);opacity:0}15%{opacity:1;transform:translateY(-14px) scale(1.15)}100%{transform:translateY(-190px) scale(1);opacity:0}}
+.gold{color:#ffd166;font-weight:700}
+.flame{color:#ffb347;font-weight:700}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.bd{border:1.5px solid var(--line);border-radius:14px;padding:10px 12px;background:var(--surface)}
+.bd b{display:block;font-family:var(--fd);font-weight:400;font-size:1.1rem}
+.bd small{color:var(--muted)}
+.bd.lock{opacity:.45;filter:grayscale(1)}
+.xpbar{height:12px;border-radius:99px;background:rgba(127,160,180,.25);overflow:hidden}
+.xpbar i{display:block;height:100%;background:linear-gradient(90deg,var(--b1),var(--p1));border-radius:99px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.stats div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.stats b{display:block;font-family:var(--fd);font-weight:400;font-size:1.5rem}
 .opt.dim{opacity:.3;text-decoration:line-through;box-shadow:none}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.14)}}
 .ring.low{animation:pulse 1s ease-in-out infinite}
@@ -194,7 +213,7 @@ details.how p{margin:.2rem 0 0}
 }
 @media (min-width:640px){.opts{grid-template-columns:1fr 1fr}}
 @media (max-width:860px) and (min-width:640px){.opts{grid-template-columns:1fr 1fr}}
-@media (prefers-reduced-motion:reduce){.tp.tgt,.tp.fl,.btn.big,.opt.ok,.opt.no,.ring.low{animation:none}.bar i,.tp{transition:none}}
+@media (prefers-reduced-motion:reduce){.tp.tgt,.tp.fl,.btn.big,.opt.ok,.opt.no,.ring.low,.rxlayer .fx{animation:none}.bar i,.tp{transition:none}}
 </style>
 
 <div class="app">
@@ -224,8 +243,10 @@ details.how p{margin:.2rem 0 0}
     </div>
     <div class="field"><label>عدد الأسئلة</label>
       <div class="seg" id="segN0" role="group">
+        <button data-v="10" aria-pressed="false">10</button>
+        <button data-v="15" aria-pressed="true">15</button>
         <button data-v="20" aria-pressed="false">20</button>
-        <button data-v="30" aria-pressed="true">30</button>
+        <button data-v="30" aria-pressed="false">30</button>
         <button data-v="40" aria-pressed="false">40</button>
       </div></div>
     <div class="field"><label>شكل الصفحة</label>
@@ -241,8 +262,9 @@ details.how p{margin:.2rem 0 0}
       </div></div>
     <details class="how">
       <summary>إزاي تلعب؟</summary>
-      <p class="muted small">كل سؤال عليه مؤقت قصير، وأول واحد يجاوب صح بيقفل الوقت على الباقي في ثواني. الأسرع بياخد نقاط أكتر. اللي يجاوب صح يغمر محافظة بجانب أرضه، ولو تابعة لمنافس بينجح الغمر بس لو جاوب أبطأ منك أو غلط. المنبع بيجف بعد 4 غمرات ناجحة عليه. تلميح تلقائي بيبهّت إجابة غلط في نص الوقت، ومعاك مرتين تحذف إجابتين (بيضيف 3 ثواني على وقتك).</p>
+      <p class="muted small">كل سؤال عليه مؤقت قصير، وأول واحد يجاوب صح بيقفل الوقت على الباقي في ثواني. الأسرع بياخد نقاط أكتر. اللي يجاوب صح يغمر محافظة بجانب أرضه، ولو تابعة لمنافس بينجح الغمر بس لو جاوب أبطأ منك أو غلط. المنبع بيجف بعد 4 غمرات ناجحة عليه. تلميح تلقائي بيبهّت إجابة غلط في نص الوقت، ومعاك مرتين تحذف إجابتين (بيضيف 3 ثواني على وقتك). 3 إجابات صح ورا بعض = كومبو 🔥 بنقاط أكتر، وكل 7 أسئلة سؤال ذهبي بنقاط مضاعفة وغمر محافظتين. والتفاعلات السريعة تحت النتيجة.</p>
     </details>
+    <button class="btn" id="btnProfile">ملفي ومستواي</button>
     <button class="btn ghost" id="btnReview">مراجعة أسئلة المعمل فنيًا</button>
   </aside>
 
@@ -289,7 +311,7 @@ details.how p{margin:.2rem 0 0}
         <div class="qhead"><h3>اللاعبين</h3><span class="chip num" id="lbCount"></span></div>
         <div id="lbRoomBox">
           <div class="muted small">كود الغرفة، ابعته لأصحابك</div>
-          <div class="row"><span class="code" id="lbCode"></span><button class="btn ghost sm" id="btnCopy">نسخ</button></div>
+          <div class="row"><span class="code" id="lbCode"></span><button class="btn ghost sm" id="btnCopy">نسخ</button><button class="btn sm" id="btnWa">ادعُ صحابك بواتساب</button></div>
         </div>
         <ul class="plist" id="lbPlayers"></ul>
         <div class="row" id="lbCpu"></div>
@@ -304,11 +326,13 @@ details.how p{margin:.2rem 0 0}
           </div></div>
         <div class="field"><label>عدد الأسئلة</label>
           <div class="seg" id="segN" role="group">
+            <button data-v="10" aria-pressed="false">10</button>
+            <button data-v="15" aria-pressed="true">15</button>
             <button data-v="20" aria-pressed="false">20</button>
-            <button data-v="30" aria-pressed="true">30</button>
+            <button data-v="30" aria-pressed="false">30</button>
             <button data-v="40" aria-pressed="false">40</button>
           </div></div>
-        <div class="muted small" id="lbRules">كل سؤال عليه مؤقت قصير، وأول واحد يجاوب صح بيقفل الوقت على الباقي. الأسرع بياخد نقاط أكتر. اللي يجاوب صح يختار محافظة بجانب أرضه ويغمرها بالمعرفة. لو تابعة لمنافس، الغمر بينجح بس لو جاوب أبطأ منك أو غلط. المنبع بيجف بعد 4 غمرات ناجحة عليه.</div>
+        <div class="muted small" id="lbRules">كل سؤال عليه مؤقت قصير، وأول واحد يجاوب صح بيقفل الوقت على الباقي. الأسرع بياخد نقاط أكتر. اللي يجاوب صح يختار محافظة بجانب أرضه ويغمرها بالمعرفة. لو تابعة لمنافس، الغمر بينجح بس لو جاوب أبطأ منك أو غلط. المنبع بيجف بعد 4 غمرات ناجحة عليه. 3 إجابات صح ورا بعض = نقاط أكتر 🔥، وكل 7 أسئلة في سؤال ذهبي بنقاط مضاعفة وغمر محافظتين.</div>
         <div class="row">
           <button class="btn" id="btnStart">ابدأ اللعب</button>
           <button class="btn ghost" id="btnLeave">خروج</button>
@@ -323,6 +347,7 @@ details.how p{margin:.2rem 0 0}
       <div class="card mapcard">
         <div class="mapwrap" id="mapwrap">
           <svg id="map" role="img" aria-label="خريطة محافظات مصر"></svg>
+          <div class="rxlayer" id="rxlayer" aria-hidden="true"></div>
         </div>
           <div class="zoom">
             <button id="zIn" aria-label="تكبير">+</button>
@@ -336,6 +361,7 @@ details.how p{margin:.2rem 0 0}
       <div class="stack" style="min-width:0">
         <div class="card" id="panel"></div>
         <div class="score" id="score"></div>
+        <div class="rxbar" id="rxbar" role="group" aria-label="تفاعلات سريعة"><button data-e="0" aria-label="تصفيق">👏</button><button data-e="1" aria-label="نار">🔥</button><button data-e="2" aria-label="ضحك">😂</button><button data-e="3" aria-label="صدمة">😱</button></div>
       </div>
     </div>
   </section>
@@ -343,8 +369,13 @@ details.how p{margin:.2rem 0 0}
   <section id="over" hidden class="card">
     <h2 id="ovTitle"></h2>
     <div class="rank" id="ovRank"></div>
-    <div class="row"><button class="btn" id="btnAgain">لعبة جديدة</button><button class="btn ghost" id="btnOverHome">الرئيسية</button></div>
+    <div class="card stack" id="ovXp" hidden></div>
+    <div class="row"><button class="btn" id="btnAgain">ريماتش</button><button class="btn ghost" id="btnOverHome">الرئيسية</button></div>
     <div class="muted small" id="ovNote"></div>
+  </section>
+
+  <section id="profile" hidden class="stack">
+    <div class="card stack" id="pfCard"></div>
   </section>
 
   <section id="review" hidden class="stack">
