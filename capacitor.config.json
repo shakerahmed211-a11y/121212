@@ -2,5 +2,8 @@
   "appId": "com.example.qalaalmamal",
   "appName": "غمر المعرفة",
   "webDir": "www",
-  "server": { "androidScheme": "https" }
+  "server": {
+    "url": "https://shakerahmed211-a11y.github.io/121212/",
+    "androidScheme": "https"
+  }
 }

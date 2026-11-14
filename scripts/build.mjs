@@ -34,7 +34,7 @@ ${body}
 <script src="config.js"></script>
 <script>
 ${js}
-if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !window.Capacitor) {
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 </script>
