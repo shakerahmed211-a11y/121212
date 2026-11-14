@@ -4,6 +4,23 @@ let pickedMode=store.get('qm_mode','mix'),ROOM=null,NR=null,mode='home',H=null,S
 let vb=[0,0,GEO.w,GEO.h],MAP=null,scale=1;
 
 function h(t,a,...c){const e=document.createElement(t);if(a)for(const k in a){const v=a[k];if(k==='class')e.className=v;else if(k==='text')e.textContent=v;else if(k.slice(0,2)==='on')e.addEventListener(k.slice(2),v);else if(v===true)e.setAttribute(k,'');else if(v!==false&&v!=null)e.setAttribute(k,v)}c.flat().forEach(x=>{if(x==null||x===false)return;e.append(x&&x.nodeType?x:document.createTextNode(x))});return e}
+/* ---------- sound + haptics ---------- */
+const SND={on:store.get('qm_snd',true),ctx:null,
+  wake(){if(!this.on)return;try{if(!this.ctx){const A=window.AudioContext||window.webkitAudioContext;if(A)this.ctx=new A()}if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume()}catch(e){}},
+  play(seq){if(!this.on||!this.ctx)return;try{const c=this.ctx,t0=c.currentTime;seq.forEach(([f,d,t,ty])=>{const o=c.createOscillator(),g=c.createGain();o.type=ty||'sine';o.frequency.value=f;g.gain.setValueAtTime(0,t0+t);g.gain.linearRampToValueAtTime(.09,t0+t+.012);g.gain.exponentialRampToValueAtTime(.0001,t0+t+d);o.connect(g).connect(c.destination);o.start(t0+t);o.stop(t0+t+d+.02)})}catch(e){}},
+  vib(p){if(this.on&&navigator.vibrate)try{navigator.vibrate(p)}catch(e){}},
+  click(){this.play([[620,.07,0,'triangle']]);this.vib(12)},
+  good(){this.play([[660,.12,0],[880,.12,.1],[1175,.22,.2]]);this.vib(35)},
+  bad(){this.play([[220,.18,0,'sawtooth'],[165,.28,.14,'sawtooth']]);this.vib([60,40,60])},
+  win(){this.play([[523,.14,0],[659,.14,.14],[784,.14,.28],[1047,.4,.42]]);this.vib([40,30,40,30,90])},
+  end(){this.play([[392,.2,0],[330,.3,.2]])}};
+addEventListener('pointerdown',()=>SND.wake(),{passive:true});
+function confetti(){const box=h('div',{class:'confetti','aria-hidden':'true'});for(let i=0;i<70;i++)box.append(h('i',{style:`left:${R(0,100)}%;background:${COLV[R(0,3)]};animation-delay:${(Math.random()*.9).toFixed(2)}s;animation-duration:${(2.2+Math.random()*2).toFixed(2)}s`}));document.body.append(box);setTimeout(()=>box.remove(),5200)}
+function onPhase(prev,next){
+  const me=myIdx();
+  if(next==='rev'&&prev!=='rev'&&S.rv&&me>=0){const ch=S.rv.ch[me];if(ch===S.rv.ci)SND.good();else SND.bad()}
+  if(next==='over'&&prev!=='over'){if(me>=0&&S.win===me){SND.win();confetti()}else SND.end()}
+}
 let toastT=0;
 function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3200)}
 function showScreens(...ids){['home','pick','lobby','game','over','review'].forEach(s=>$('#'+s).hidden=!ids.includes(s));$('#btnHome').hidden=ids.includes('home');$('#btnMenu').hidden=!(ids.includes('home')||ids.includes('pick'));closeMenu()}
@@ -31,7 +48,7 @@ function applyState(s){
   const j=JSON.stringify(s,(k,v)=>k==='rem'?undefined:v);
   const changed=j!==SJ;SJ=j;S=s;S._at=performance.now();
   if(S.n!==lastN){lastN=S.n;choice=-1;sel=null}
-  if(S.ph!==lastPh){if(S.ph!=='claim')sel=null;lastPh=S.ph}
+  if(S.ph!==lastPh){if(S.ph!=='claim')sel=null;onPhase(lastPh,S.ph);lastPh=S.ph}
   if(changed)render();else tick();
 }
 function wire(){
@@ -278,7 +295,8 @@ function renderScore(){
     else if(S.rv&&S.ph!=='lobby')tag=S.rv.ch[i]===S.rv.ci?'صح ✓':(S.rv.ch[i]<0?'ما جاوبش':'غلط ✗');
     box.append(h('div',{class:'sc'+(i===me?' me':'')+(p.out?' out':'')},
       h('div',{class:'nm'},dot(i),h('span',{class:'t',text:p.nm+(i===me?' (أنت)':'')})),
-      h('div',{class:'st'},h('span',{class:'num',text:tilesCount(i)+' محافظة · '+p.ok+' صح'}),h('span',{text:p.cpu?'كمبيوتر '+LVL[p.cpu]:''})),
+      h('div',{class:'st'},h('span',{class:'num',text:tilesCount(i)+' محافظة · '+p.ok+' صح'}),h('span',{text:p.cpu?LVL[p.cpu]:''})),
+      h('div',{class:'prog','aria-hidden':'true'},h('i',{style:`width:${tilesCount(i)/GEO.ids.length*100}%;background:${COLV[p.ci]}`})),
       h('div',{class:'st'},
         castle?h('span',{class:'pips','aria-label':'ضربات المنبع '+(S.ht[p.cs]||0)+' من 4'},[0,1,2,3].map(k=>h('i',{class:k<(S.ht[p.cs]||0)?'f':''})),h('span',{style:'margin-inline-start:6px',text:'منبع'})):h('span',{text:p.out?'المنبع جفّ':''}),
         h('span',{text:tag}))));
@@ -304,7 +322,7 @@ function optButtons(interactive){
 function pickAnswer(k){
   if(!S||S.ph!=='q'||choice>=0)return;
   const me=myIdx();if(me<0||S.pl[me].out||S.pl[me].gone)return;
-  choice=k;resendAt=performance.now()+1800;send({k:'a',n:S.n,c:k});renderPanel();
+  choice=k;SND.click();resendAt=performance.now()+1800;send({k:'a',n:S.n,c:k});renderPanel();
 }
 function claimNow(){
   if(!sel||!canClaim())return;
@@ -320,12 +338,11 @@ function renderPanel(){
   if(!S||!S.q&&S.ph!=='over'){return}
   if(S.ph==='over'){box.append(h('div',{class:'muted',text:'اللعبة انتهت. شوف النتيجة فوق.'}));return}
   const q=S.q,me=myIdx(),mine=me>=0&&!S.pl[me].out&&!S.pl[me].gone;
-  const timer=h('span',{class:'chip num',id:'tnum'});
+  const timer=h('span',{class:'ring',id:'ring'});timer.innerHTML='<svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" class="rb"/><circle cx="22" cy="22" r="19" class="rf" id="tring" transform="rotate(-90 22 22)"/></svg><b id="tnum" class="num"></b>';
   box.append(h('div',{class:'qhead'},
     h('span',{class:'chip num',text:`سؤال ${S.n} من ${S.N}`}),
     h('span',{class:'chip',text:q.c}),
     q.l?h('span',{class:'chip',text:LVL[q.l]}):null,timer));
-  box.append(h('div',{class:'bar','aria-hidden':'true'},h('i',{id:'tbar',style:'width:100%'})));
   box.append(h('div',{class:'qtext',text:q.t}));
   if(S.ph==='q'){
     box.append(h('div',{class:'opts'},optButtons(mine&&choice<0)));
@@ -373,8 +390,8 @@ function tick(){
   }
   const el=(performance.now()-S._at)/1000,rem=Math.max(0,S.rem-el);
   const tn=$('#tnum'),tb=$('#tbar');
-  if(tn)tn.textContent=Math.ceil(rem)+' ث';
-  if(tb&&S.dur)tb.style.width=Math.min(100,rem/S.dur*100)+'%';
+  if(tn)tn.textContent=Math.ceil(rem);
+  const tr=$('#tring');if(tr&&S.dur){const C=2*Math.PI*19;tr.style.strokeDasharray=C;tr.style.strokeDashoffset=C*(1-Math.min(1,rem/S.dur));$('#ring').classList.toggle('low',rem<=5)}
   const ni=$('#nextIn');if(ni)ni.textContent=S.n>=S.N?'':'السؤال التالي بعد '+Math.ceil(rem)+' ث';
   if(mode==='client'&&performance.now()>resendAt){
     const me=myIdx();
@@ -422,8 +439,10 @@ async function exportFlags(){
 /* ---------- init ---------- */
 function drawMini(){
   const s=$('#miniSvg');s.setAttribute('viewBox',`0 0 ${GEO.w} ${GEO.h}`);
-  const col={alx:0,asw:1,nsi:2,asy:3};
-  GEO.ids.forEach(id=>s.append(sv('path',{d:GEO.t[id].d,style:`fill:${id in col?COLV[col[id]]:'var(--land)'};stroke:var(--ink);stroke-width:1.2;vector-effect:non-scaling-stroke`})));
+  const P=GEO.ids.map(id=>{const p=sv('path',{d:GEO.t[id].d,class:'mp',style:'fill:var(--land);stroke:var(--ink);stroke-opacity:.5;stroke-width:1;vector-effect:non-scaling-stroke'});s.append(p);return p});
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches){[0,1,2,3].forEach(k=>P[R(0,P.length-1)].style.fill=COLV[k]);return}
+  let k=0;
+  setInterval(()=>{if($('#home').hidden)return;P[R(0,P.length-1)].style.fill=COLV[R(0,3)];if(++k>46){P.forEach(x=>x.style.fill='var(--land)');k=0}},420);
 }
 function netNote(){
   const n=$('#netNote');
@@ -446,7 +465,8 @@ function init(){
   addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
   document.querySelectorAll('#segN0 button').forEach(b=>{b.setAttribute('aria-pressed',+b.dataset.v===savedN());b.onclick=()=>{store.set('qm_n',+b.dataset.v);document.querySelectorAll('#segN0 button').forEach(x=>x.setAttribute('aria-pressed',x===b))}});
   document.querySelectorAll('#segTheme button').forEach(b=>b.onclick=()=>{store.set('qm_theme',b.dataset.v);applyTheme(b.dataset.v)});
-  applyTheme(store.get('qm_theme','auto'));
+  applyTheme(store.get('qm_theme','dark'));
+  document.querySelectorAll('#segSnd button').forEach(b=>{b.setAttribute('aria-pressed',(b.dataset.v==='on')===SND.on);b.onclick=()=>{SND.on=b.dataset.v==='on';store.set('qm_snd',SND.on);document.querySelectorAll('#segSnd button').forEach(x=>x.setAttribute('aria-pressed',x===b));SND.wake();SND.click()}});
   $('#inCode').addEventListener('keydown',e=>{if(e.key==='Enter')joinRoom()});
   $('#btnHome').onclick=leaveAll;$('#btnLeave').onclick=leaveAll;$('#btnOverHome').onclick=leaveAll;
   $('#btnAgain').onclick=()=>{if(H){H.again();if(mode==='solo')H.start()}};
