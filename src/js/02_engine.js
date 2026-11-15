@@ -69,7 +69,8 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
     startQ();
   }
   function choose(){
-    const cats=st.mode==='lab'?LABC:st.mode==='gen'?GENC:[...LABC,...GENC];
+    // easy general-knowledge questions get extra weight so everyone can answer some
+    const cats=st.mode==='lab'?LABC:st.mode==='gen'?[...GENC,'easy','easy']:[...LABC,...GENC,'easy','easy'];
     const seen=new Set(store.get('qm_seen',[]));
     for(let tries=0;tries<30;tries++){
       const c=pick(cats);

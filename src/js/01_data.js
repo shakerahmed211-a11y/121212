@@ -2,8 +2,8 @@
 const BANK=__BANK__;
 const GEO=__GEO__;
 const $=s=>document.querySelector(s);
-const CAT={soil:'تربة',concrete:'خرسانة',asphalt:'أسفلت',aggregate:'ركام',labcalc:'حسابات المعمل',history:'تاريخ',arts:'فن وثقافة',geography:'جغرافيا',science:'علوم',sports:'رياضة',math:'حساب'};
-const LABC=['soil','concrete','asphalt','aggregate','labcalc'], GENC=['history','arts','geography','science','sports','math'];
+const CAT={soil:'تربة',concrete:'خرسانة',asphalt:'أسفلت',aggregate:'ركام',labcalc:'حسابات المعمل',history:'تاريخ',arts:'فن وثقافة',geography:'جغرافيا',science:'علوم',sports:'رياضة',math:'حساب',easy:'معلومات عامة'};
+const LABC=['soil','concrete','asphalt','aggregate','labcalc'], GENC=['history','arts','geography','science','sports','math','easy'];
 const LET=['أ','ب','ج','د'];
 const LVL=['','سهل','متوسط','صعب'];
 const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
