@@ -1,14 +1,13 @@
 /* ================= HOST ENGINE (runs on the room owner's device, or locally in solo play) ================= */
-const CLAIM_SEC=8, REV_MIN=3, CASTLE_HITS=4, LAST_SEC=5, FIFTY=2, PTS=[10,7,5,3], PEN_SEC=3;
+const SP_SEC=15, BATTLE_LOSS=4, DEF_BONUS=3, TILE_PTS=3, CLAIM_SEC=10, REV_MIN=3, CASTLE_HITS=4, LAST_SEC=5, FIFTY=2, PTS=[10,7,5,3], PEN_SEC=3;
 /* seconds for a question: by difficulty (calculations get more), plus reading time for long questions */
 function qdur(q,calc){const len=(q.t||'').length+(q.o||[]).join('').length;const base=calc?30:(q.l===3?20:q.l===1?12:15);return base+Math.min(8,Math.round(len/90))}
-const STARTS={2:['alx','asw'],3:['alx','asw','nsi'],4:['alx','asw','nsi','asy']};
 const CPU_P=[0,.5,.7,.88], CPU_T=[null,[8,16],[5,11],[3,8]];
 
 function cleanName(s){return String(s||'').replace(/[\u0000-\u001f​-‏‪-‮⁦-⁩]/g,'').trim().slice(0,18)}
 
 function makeHost(code,emit,onLocal,getPeers,meFn){
-  const st={ph:'lobby',code,mode:'mix',N:15,n:0,pl:[],ow:{},ht:{},q:null,ans:[],cl:null,rv:null,rem:0,dur:0,win:-1,hd:[],hf:{},ls:0,nx:[],gd:0,rx:null};
+  const st={ph:'lobby',code,mode:'mix',N:15,n:0,pl:[],ow:{},ht:{},lk:[],q:null,ans:[],cl:null,rv:null,rem:0,dur:0,win:-1,hd:[],hf:{},ls:0,nx:[],gd:0,rx:null};
   const hs={used:new Set(),qa:-1,qStart:0,ans:{},claims:{},tm:null,cpuT:[],dl:0,hb:null,cpuSeq:0,rxS:0,rxT:{},pen:{},cpuQ:[],first:false,lc:false};
 
   function clearT(){clearTimeout(hs.tm);hs.cpuT.forEach(clearTimeout);hs.cpuT=[]}
@@ -26,13 +25,15 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
   }
 
   /* ----- lobby ----- */
+  function mkP(id,nm,ci,cpu,fl){return {id,nm,ci,cpu,fl:fl==null?ci:fl,out:0,gone:0,ok:0,pts:0,cb:0,mc:0,h:FIFTY,cs:''}}
+  function dedupeFl(arr){const u=new Set();arr.forEach(p=>{let f=p.fl;if(!(f>=0&&f<8)||u.has(f)){f=-1;for(let k=0;k<8;k++)if(!u.has(k)){f=k;break}}p.fl=f;u.add(f)})}
   function freeColor(){const u=new Set(st.pl.map(p=>p.ci));for(let c=0;c<4;c++)if(!u.has(c))return c;return 0}
   function syncRoster(){
     if(st.ph!=='lobby')return;
     const peers=(getPeers?getPeers():[]).filter(p=>p.kind==='viewer'&&p.presence&&p.presence.nm).sort((a,b)=>(a.peer===meFn()?-1:b.peer===meFn()?1:(a.presence.t||0)-(b.presence.t||0)));
     const old=new Map(st.pl.filter(p=>!p.cpu).map(p=>[p.id,p]));
     const cpus=st.pl.filter(p=>p.cpu);
-    let humans=peers.length?peers.map(p=>({id:p.peer,nm:cleanName(p.presence.nm)||'لاعب',cpu:0})):[{id:meFn(),nm:cleanName(window.__myName)||'أنا',cpu:0}];
+    let humans=peers.length?peers.map(p=>({id:p.peer,nm:cleanName(p.presence.nm)||'لاعب',cpu:0,fl:p.presence.fl})):[{id:meFn(),nm:cleanName(window.__myName)||'أنا',cpu:0,fl:window.__myFlag}];
     humans=humans.slice(0,4);
     const keep=cpus.slice(0,Math.max(0,4-humans.length));
     const next=[];
@@ -40,8 +41,9 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
     humans.forEach(h=>{const o=old.get(h.id);if(o&&!used.has(o.ci)){h.ci=o.ci;used.add(o.ci)}});
     keep.forEach(c=>{if(!used.has(c.ci)){used.add(c.ci)}else c.ci=-1});
     const take=()=>{for(let c=0;c<4;c++)if(!used.has(c)){used.add(c);return c}return 0};
-    humans.forEach(h=>{if(h.ci==null)h.ci=take();next.push({id:h.id,nm:h.nm,ci:h.ci,cpu:0,out:0,gone:0,ok:0,pts:0,cb:0,mc:0,h:FIFTY,cs:''})});
-    keep.forEach(c=>{if(c.ci<0)c.ci=take();next.push({id:c.id,nm:c.nm,ci:c.ci,cpu:c.cpu,out:0,gone:0,ok:0,pts:0,cb:0,mc:0,h:FIFTY,cs:''})});
+    humans.forEach(h=>{if(h.ci==null)h.ci=take();next.push(mkP(h.id,h.nm,h.ci,0,h.fl))});
+    keep.forEach(c=>{if(c.ci<0)c.ci=take();next.push(mkP(c.id,c.nm,c.ci,c.cpu,c.fl))});
+    dedupeFl(next);
     st.pl=next;
     broadcast();
   }
@@ -49,7 +51,7 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
     if(st.ph!=='lobby'||st.pl.length>=4)return;
     hs.cpuSeq++;
     const used=new Set(st.pl.map(p=>p.ci));let ci=0;for(let c=0;c<4;c++)if(!used.has(c)){ci=c;break}
-    st.pl.push({id:'cpu'+hs.cpuSeq,nm:'كمبيوتر '+(st.pl.filter(p=>p.cpu).length+1),ci,cpu:level,out:0,gone:0,ok:0,pts:0,cb:0,mc:0,h:FIFTY,cs:''});
+    st.pl.push(mkP('cpu'+hs.cpuSeq,'كمبيوتر '+(st.pl.filter(p=>p.cpu).length+1),ci,level,ci));dedupeFl(st.pl);
     broadcast();
   }
   function removeCpu(idx){ if(st.ph==='lobby'&&st.pl[idx]&&st.pl[idx].cpu){st.pl.splice(idx,1);broadcast()} }
@@ -58,10 +60,39 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
   /* ----- game ----- */
   function start(){
     if(st.ph!=='lobby'||st.pl.length<2)return false;
-    st.ow={};st.ht={};st.n=0;st.win=-1;hs.used.clear();
-    const spots=shuf(STARTS[st.pl.length]);
-    st.pl.forEach((p,i)=>{p.out=0;p.ok=0;p.pts=0;p.cb=0;p.mc=0;p.h=FIFTY;p.gone=0;p.cs=spots[i];st.ow[spots[i]]=i});
-    nextQ();return true;
+    clearT();
+    st.ow={};st.ht={};st.lk=[];st.n=0;st.win=-1;hs.used.clear();
+    st.pl.forEach(p=>{p.out=0;p.ok=0;p.pts=0;p.cb=0;p.mc=0;p.h=FIFTY;p.gone=0;p.cs=''});
+    st.ph='sp';st.dur=SP_SEC;hs.dl=Date.now()+SP_SEC*1000;
+    hs.tm=setTimeout(finishSp,SP_SEC*1000);
+    st.pl.forEach((p,i)=>{if(p.cpu)hs.cpuT.push(setTimeout(()=>{const t=spFree(i);if(t){pickSource(i,t);lockSource(i)}},R(1500,5000)))});
+    broadcast();return true;
+  }
+  /* source selection: a free province that is not next to anyone else's source */
+  function spOk(i,t){
+    if(typeof t!=='string'||!GEO.t[t])return false;
+    if(st.ow[t]!==undefined&&st.ow[t]!==i)return false;
+    return !GEO.t[t].adj.some(a=>st.ow[a]!==undefined&&st.ow[a]!==i);
+  }
+  function spFree(i){const c=GEO.ids.filter(t=>spOk(i,t));return c.length?pick(c):null}
+  function pickSource(i,t){
+    if(st.ph!=='sp'||!st.pl[i]||st.lk.includes(i)||!spOk(i,t))return;
+    const old=st.pl[i].cs;if(old)delete st.ow[old];
+    st.pl[i].cs=t;st.ow[t]=i;broadcast();
+  }
+  function lockSource(i){
+    if(st.ph!=='sp'||!st.pl[i]||!st.pl[i].cs||st.lk.includes(i))return;
+    st.lk.push(i);
+    if(spDone()){clearTimeout(hs.tm);finishSp();return}
+    broadcast();
+  }
+  function spDone(){return st.pl.every((p,i)=>p.gone||st.lk.includes(i))}
+  function finishSp(){
+    if(st.ph!=='sp')return;
+    clearT();
+    st.pl.forEach((p,i)=>{if(!p.cs){const t=spFree(i);if(t){p.cs=t;st.ow[t]=i}}});
+    st.lk=st.pl.map((p,i)=>i);
+    nextQ();
   }
   function nextQ(){
     clearT();
@@ -199,7 +230,7 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
         const e=st.ow[t];
         if(e===undefined){st.ow[t]=a;log.push(['cap',a,t]);cpuReact(a,[1,0]);return}
         const defOk=ch[e]===ci&&!st.pl[e].out;
-        if(defOk&&tm[e]<tm[a]){log.push(['def',a,t,e]);cpuReact(e,[2]);return}
+        if(defOk&&tm[e]<tm[a]){const lost=Math.min(st.pl[a].pts||0,BATTLE_LOSS);st.pl[a].pts-=lost;st.pl[e].pts+=DEF_BONUS;log.push(['def',a,t,e,lost]);cpuReact(e,[2]);return}
         if(st.pl[e].cs===t){
           st.ht[t]=(st.ht[t]||0)+1;
           if(st.ht[t]>=CASTLE_HITS){
@@ -223,8 +254,9 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
     hs.tm=setTimeout(nextQ,secs*1000);
     broadcast();
   }
+  function score(i){return (st.pl[i].pts||0)+TILE_PTS*tilesOf(i).length}
   function ranking(){
-    return st.pl.map((p,i)=>({i,t:tilesOf(i).length,pts:p.pts||0,ok:p.ok,out:p.out})).sort((a,b)=>(b.t-a.t)||(b.pts-a.pts)||(b.ok-a.ok));
+    return st.pl.map((p,i)=>({i,t:tilesOf(i).length,sc:score(i),ok:p.ok,out:p.out})).sort((a,b)=>(a.out-b.out)||(b.sc-a.sc)||(b.t-a.t)||(b.ok-a.ok));
   }
   function endGame(){
     clearT();
@@ -234,7 +266,7 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
   }
   function again(){
     clearT();
-    st.ph='lobby';st.ow={};st.ht={};st.n=0;st.q=null;st.rv=null;st.cl=null;st.win=-1;st.dur=0;hs.dl=0;
+    st.ph='lobby';st.ow={};st.ht={};st.lk=[];st.n=0;st.q=null;st.rv=null;st.cl=null;st.win=-1;st.dur=0;hs.dl=0;
     st.pl=st.pl.map(p=>({...p,out:0,gone:0,ok:0,pts:0,cb:0,mc:0,h:FIFTY,cs:''}));st.hd=[];st.hf={};st.ls=0;st.nx=[];st.gd=0;st.rx=null;
     syncRoster();
   }
@@ -243,6 +275,7 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
     if(i<0)return;
     if(st.ph==='lobby'){syncRoster();return}
     st.pl[i].gone=1;
+    if(st.ph==='sp'){if(spDone()){clearTimeout(hs.tm);finishSp()}else broadcast();return}
     if(st.ph==='q'&&active().every(k=>hs.ans[k])&&active().length){clearTimeout(hs.tm);endQ();return}
     if(st.ph==='rev'&&allReady()){clearTimeout(hs.tm);nextQ();return}
     if(st.ph==='claim'&&st.cl){st.cl.el=st.cl.el.filter(k=>k!==i);if(st.cl.el.every(k=>st.cl.dn.includes(k))){clearTimeout(hs.tm);resolve();return}}
@@ -254,8 +287,10 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
     if(m.k==='hi'){broadcast();return}
     if(i<0)return;
     if(m.k==='a'&&m.n===st.n)answer(i,m.c);
-    else if(m.k==='c'&&m.n===st.n&&typeof m.t==='string')claim(i,m.t);
+    else if(m.k==='c'&&m.n===st.n&&(typeof m.t==='string'||Array.isArray(m.t)))claim(i,m.t);
     else if(m.k==='f'&&m.n===st.n)fifty(i);
+    else if(m.k==='s')pickSource(i,m.t);
+    else if(m.k==='l')lockSource(i);
     else if(m.k==='r')react(i,m.e|0);
     else if(m.k==='x'&&m.n===st.n&&st.ph==='rev'&&!st.nx.includes(i)){st.nx.push(i);if(allReady()){clearTimeout(hs.tm);nextQ()}else broadcast()}
   }

@@ -91,6 +91,21 @@ select{font:inherit;color:var(--ink);background:var(--bg);border:1.5px solid var
 .tp.own{stroke:var(--ink);stroke-width:1.2}
 .tp.tgt{stroke:var(--tgt);stroke-width:3;stroke-dasharray:7 5;animation:dash 1s linear infinite}
 .tp.sel{stroke:var(--tgt);stroke-width:4;stroke-dasharray:none}
+.tp.bt{stroke:var(--bad)}
+.mk .fg{transform-box:fill-box;transform-origin:50% 100%}
+.mk .fg.plant{animation:plant .7s cubic-bezier(.3,1.4,.5,1)}
+@keyframes plant{0%{transform:translateY(-34px) scale(.2);opacity:0}60%{opacity:1}100%{transform:none;opacity:1}}
+.mbar{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.mbar[hidden]{display:none}
+.mbar .bt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.mbar .bt b{font-size:1rem}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.peekbtn{display:none}
+.embs{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:8px}
+.embs button{border:1.5px solid var(--line);border-radius:12px;background:var(--surface);min-height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:.78rem;padding:6px}
+.embs button[aria-pressed=true]{border-color:var(--ink);border-width:2.5px}
+.embs button:disabled{opacity:.45}
+#panel:empty{display:none}
 @keyframes dash{to{stroke-dashoffset:-24}}
 .lb{font-family:var(--fb);font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--land);stroke-width:3px;stroke-linejoin:round;pointer-events:none;text-anchor:middle}
 .lb.own{stroke:none}
@@ -206,6 +221,25 @@ details.how p{margin:.2rem 0 0}
 @keyframes flood{0%{fill-opacity:.1;stroke-width:5}100%{fill-opacity:1}}
 .tp.fl{animation:flood .9s ease-out}
 @media (max-width:860px){
+  .game{gap:8px}
+  #score{order:-1;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .sc{padding:6px 8px;gap:2px}
+  .sc .prog,.sc>.st:last-child{display:none}
+  .sc .st{font-size:.76rem}
+  .peekbtn{display:inline-flex}
+  #game[data-view=sp] #panel,#game[data-view=sp] #rxbar,#game[data-view=claim] #panel,#game[data-view=claim] #rxbar,#game[data-view=q] #rxbar{display:none}
+  #game[data-view=q] .mapcard{display:none}
+  #game[data-view=q].peek .mapcard{display:flex}
+  #game[data-view=q].peek #panel{display:none}
+  #game[data-view=res] .stack{order:-1}
+  #game[data-view=res] .mapwrap{width:78%;margin-inline:auto}
+  #game[data-view=res] .zoom,#game[data-view=res] .legend,#game[data-view=res] .cap{display:none}
+  #game[data-view=res] .opt:not(.ok):not(.no){display:none}
+  #game[data-view=res] .qhead{display:none}
+  #game[data-view=res] .qtext{font-size:.95rem;margin:0 0 6px}
+  #game[data-view=res] .rxbar button{min-height:38px;font-size:1.1rem}
+  #game[data-view=q] .hint{display:none}
+  #game[data-view=sp] .cap,#game[data-view=claim] .cap{display:none}
   .hero,.lobby,.game{grid-template-columns:1fr}
   .cards,#pickB .cards{grid-template-columns:1fr}
   .pc{min-height:0}
@@ -262,7 +296,7 @@ details.how p{margin:.2rem 0 0}
       </div></div>
     <details class="how">
       <summary>إزاي تلعب؟</summary>
-      <p class="muted small">كل سؤال عليه مؤقت قصير، وأول واحد يجاوب صح بيقفل الوقت على الباقي في ثواني. الأسرع بياخد نقاط أكتر. اللي يجاوب صح يغمر محافظة بجانب أرضه، ولو تابعة لمنافس بينجح الغمر بس لو جاوب أبطأ منك أو غلط. المنبع بيجف بعد 4 غمرات ناجحة عليه. تلميح تلقائي بيبهّت إجابة غلط في نص الوقت، ومعاك مرتين تحذف إجابتين (بيضيف 3 ثواني على وقتك). 3 إجابات صح ورا بعض = كومبو 🔥 بنقاط أكتر، وكل 7 أسئلة سؤال ذهبي بنقاط مضاعفة وغمر محافظتين. والتفاعلات السريعة تحت النتيجة.</p>
+      <p class="muted small">كل سؤال عليه مؤقت قصير، وأول واحد يجاوب صح بيقفل الوقت على الباقي في ثواني. الأسرع بياخد نقاط أكتر. في الأول كل لاعب بيختار من الخريطة المحافظة اللي هيبدأ منها وبيزرع عليها علمه. بعد كده اللي يجاوب صح يغمر محافظة مجاورة لأرضه من الخريطة. لو المحافظة تابعة لمنافس بتبقى معركة على نفس السؤال: لو جاوب هو صح وأسرع منك بيصدّك (وبياخد 3 نقاط) وإنت بتخسر 4 نقاط، ولو لأ بتاخدها. المنبع بيجف بعد 4 ضربات ناجحة عليه. الفايز صاحب أعلى مجموع: نقاطك + 3 لكل محافظة معاك في الآخر. تلميح تلقائي بيبهّت إجابة غلط في نص الوقت، ومعاك مرتين تحذف إجابتين (بيضيف 3 ثواني على وقتك). 3 إجابات صح ورا بعض = كومبو 🔥 بنقاط أكتر، وكل 7 أسئلة سؤال ذهبي بنقاط مضاعفة وغمر محافظتين. والتفاعلات السريعة تحت النتيجة.</p>
     </details>
     <button class="btn" id="btnProfile">ملفي ومستواي</button>
     <button class="btn ghost" id="btnReview">مراجعة أسئلة المعمل فنيًا</button>
@@ -332,7 +366,7 @@ details.how p{margin:.2rem 0 0}
             <button data-v="30" aria-pressed="false">30</button>
             <button data-v="40" aria-pressed="false">40</button>
           </div></div>
-        <div class="muted small" id="lbRules">كل سؤال عليه مؤقت قصير، وأول واحد يجاوب صح بيقفل الوقت على الباقي. الأسرع بياخد نقاط أكتر. اللي يجاوب صح يختار محافظة بجانب أرضه ويغمرها بالمعرفة. لو تابعة لمنافس، الغمر بينجح بس لو جاوب أبطأ منك أو غلط. المنبع بيجف بعد 4 غمرات ناجحة عليه. 3 إجابات صح ورا بعض = نقاط أكتر 🔥، وكل 7 أسئلة في سؤال ذهبي بنقاط مضاعفة وغمر محافظتين.</div>
+        <div class="muted small" id="lbRules">كل سؤال عليه مؤقت قصير، وأول واحد يجاوب صح بيقفل الوقت على الباقي. الأسرع بياخد نقاط أكتر. الأول كل لاعب يختار من الخريطة محافظة يبدأ منها ويزرع علمه. بعدها اللي يجاوب صح يغمر محافظة مجاورة. لو تابعة لمنافس بتبقى معركة بنفس السؤال: المهاجم لو خسر بيخسر 4 نقاط والمدافع الناجح ياخد 3. الفايز بأعلى مجموع (نقاطك + 3 لكل محافظة). 3 إجابات صح ورا بعض = نقاط أكتر 🔥، وكل 7 أسئلة في سؤال ذهبي بنقاط مضاعفة وغمر محافظتين.</div>
         <div class="row">
           <button class="btn" id="btnStart">ابدأ اللعب</button>
           <button class="btn ghost" id="btnLeave">خروج</button>
@@ -345,6 +379,7 @@ details.how p{margin:.2rem 0 0}
   <section id="game" hidden>
     <div class="game">
       <div class="card mapcard">
+        <div class="mbar" id="mbar" hidden></div>
         <div class="mapwrap" id="mapwrap">
           <svg id="map" role="img" aria-label="خريطة محافظات مصر"></svg>
           <div class="rxlayer" id="rxlayer" aria-hidden="true"></div>

@@ -1,7 +1,12 @@
 /* ================= UI + NETWORK ================= */
 const COLV=['var(--p1)','var(--p2)','var(--p3)','var(--p4)'], INKV=['var(--p1i)','var(--p2i)','var(--p3i)','var(--p4i)'];
 let pickedMode=store.get('qm_mode','mix'),ROOM=null,NR=null,mode='home',H=null,S=null,SJ='',lastN=-1,lastPh='',choice=-1,sel=null,sel2=null,lostHost=0,resendAt=0,roomCode='';
-let vb=[0,0,GEO.w,GEO.h],MAP=null,scale=1;
+let vb=[0,0,GEO.w,GEO.h],MAP=null,scale=1,peek=false,fitKey='';
+/* ---------- flags / emblems (shape + colour so they work without colour vision) ---------- */
+const STAR=(()=>{let d='';for(let k=0;k<10;k++){const r=k%2?2.1:5,a=-Math.PI/2+k*Math.PI/5;d+=(k?'L':'M')+(Math.cos(a)*r).toFixed(2)+' '+(Math.sin(a)*r).toFixed(2)}return d+'Z'})();
+const GLY=['M-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0Z','M-3.5 -3.5h7v7h-7Z','M0 -4.5L4.5 3.5H-4.5Z','M0 -5L4.5 0L0 5L-4.5 0Z',STAR,'M-1.3 -4.5h2.6v3.2h3.2v2.6h-3.2v3.2h-2.6v-3.2h-3.2v-2.6h3.2Z','M-4.5 -3.5h9v2.2h-9Zm0 4.8h9v2.2h-9Z','M-2.5 -4.3h5L5 0l-2.5 4.3h-5L-5 0Z'];
+const EMB_NAMES=['دايرة','مربع','مثلث','معيّن','نجمة','صليب','خطوط','سداسي'],EMB_LV=[1,1,1,1,2,3,5,7];
+
 
 function h(t,a,...c){const e=document.createElement(t);if(a)for(const k in a){const v=a[k];if(k==='class')e.className=v;else if(k==='text')e.textContent=v;else if(k.slice(0,2)==='on')e.addEventListener(k.slice(2),v);else if(v===true)e.setAttribute(k,'');else if(v!==false&&v!=null)e.setAttribute(k,v)}c.flat().forEach(x=>{if(x==null||x===false)return;e.append(x&&x.nodeType?x:document.createTextNode(x))});return e}
 /* ---------- sound + haptics ---------- */
@@ -36,7 +41,7 @@ let GM={caps:0,fall:0,fast:0,gold:0},awarded=false;
 function awardGame(){
   const me=myIdx();if(awarded||me<0||!S||!S.pl[me])return;awarded=true;
   const p=S.pl[me],P=loadProf(),won=S.win===me;
-  const gain=20+(p.pts||0)+(won?40:0);
+  const gain=20+totalOf(me)+(won?40:0);
   const l0=lvlOf(P.xp);
   P.xp+=gain;P.games++;if(won)P.wins++;P.corr+=p.ok;P.combo=Math.max(P.combo,p.mc||0);P.fast+=GM.fast;
   const got=[];const give=id=>{if(!P.badges[id]){P.badges[id]=Date.now();got.push(BADGES.find(b=>b.id===id))}};
@@ -59,6 +64,12 @@ function renderProfile(){
       h('div',null,h('b',{class:'num',text:String(P.wins)}),h('span',{class:'small muted',text:'فوز'})),
       h('div',null,h('b',{class:'num',text:String(P.corr)}),h('span',{class:'small muted',text:'إجابات صح'})),
       h('div',null,h('b',{class:'num',text:String(P.combo)}),h('span',{class:'small muted',text:'أطول كومبو'}))),
+    h('h3',{text:'علمك'}),
+    h('div',{class:'small muted',text:'العلم بيتزرع على كل محافظة تغمرها. فتح أشكال جديدة كل ما مستواك يزيد.'}),
+    h('div',{class:'embs'},EMB_NAMES.map((n,k)=>{const ok=l>=EMB_LV[k],cur=store.get('qm_fl',-1)===k;
+      const b=h('button',{disabled:!ok,'aria-pressed':cur?'true':'false',onclick:()=>{store.set('qm_fl',k);renderProfile()}});
+      const sv0=document.createElementNS(NS,'svg');sv0.setAttribute('viewBox','0 0 18 18');sv0.setAttribute('width',26);sv0.setAttribute('height',26);const pp=document.createElementNS(NS,'path');pp.setAttribute('d',GLY[k]);pp.setAttribute('transform','translate(9 9)');pp.style.fill='var(--ink)';sv0.append(pp);
+      b.append(sv0,h('span',{text:ok?n:'مستوى '+EMB_LV[k]}));return b})),
     h('h3',{text:'الشارات'}),
     h('div',{class:'badges'},BADGES.map(b=>h('div',{class:'bd'+(P.badges[b.id]?'':' lock')},h('b',{text:b.n}),h('small',{text:b.d})))));
 }
@@ -92,7 +103,10 @@ function hostPeer(){if(!NR)return null;const a=NR.peers().filter(p=>p.presence&&
 const tname=id=>GEO.t[id].n;
 const pname=i=>S.pl[i]?S.pl[i].nm:'؟';
 const isHost=()=>mode==='host'||mode==='solo';
-function dot(i){return h('span',{class:'badge',style:`background:${COLV[S.pl[i].ci]};color:${INKV[S.pl[i].ci]}`,text:String(i+1)})}
+function glyphSvg(f,ci,sz){const e=document.createElementNS(NS,'svg');e.setAttribute('viewBox','0 0 18 18');e.setAttribute('width',sz||14);e.setAttribute('height',sz||14);e.setAttribute('aria-hidden','true');const p=document.createElementNS(NS,'path');p.setAttribute('d',GLY[(f|0)%8]);p.setAttribute('transform','translate(9 9)');p.style.fill=INKV[ci];e.append(p);return e}
+function dot(i){const p=S.pl[i];return h('span',{class:'badge',style:`background:${COLV[p.ci]}`,title:p.nm},glyphSvg(p.fl,p.ci))}
+const totalOf=i=>(S.pl[i].pts||0)+3*tilesCount(i);
+const myFlag=()=>{const f=store.get('qm_fl',-1);return f>=0&&f<8&&lvlOf(loadProf().xp)>=EMB_LV[f]?f:undefined};
 function validFor(i){const s=new Set();Object.keys(S.ow).forEach(t=>{if(S.ow[t]===i)GEO.t[t].adj.forEach(a=>{if(S.ow[a]!==i)s.add(a)})});return [...s]}
 
 /* ---------- send / receive ---------- */
@@ -122,7 +136,7 @@ function wire(){
 const genCode=()=>{const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';for(let i=0;i<5;i++)s+=a[R(0,a.length-1)];return s};
 
 function newHost(code,emit,solo){
-  window.__myName=myName();
+  window.__myName=myName();window.__myFlag=myFlag();
   H=makeHost(code,emit,applyState,()=>NR?NR.peers():[],()=>myId());
   return H;
 }
@@ -132,7 +146,7 @@ async function createRoom(){
   const code=genCode();
   try{NR=await ROOM.join('qm-'+code)}catch(e){toast('مقدرتش أفتح الغرفة، جرّب تاني.');return}
   wire();mode='host';roomCode=code;
-  try{await NR.presence({nm:myName(),role:'host',t:Date.now()})}catch(e){}
+  try{await NR.presence({nm:myName(),role:'host',t:Date.now(),fl:myFlag()})}catch(e){}
   newHost(code,s=>NR.emit('h2c',JSON.parse(s)).catch(()=>{}));
   H.syncRoster();H.setOpt('mode',pickedMode);H.setOpt('N',savedN());
 }
@@ -143,7 +157,7 @@ async function joinRoom(){
   store.set('qm_name',myName());
   try{NR=await ROOM.join('qm-'+code)}catch(e){toast('مقدرتش أدخل الغرفة، جرّب تاني.');return}
   wire();mode='client';roomCode=code;S=null;SJ='';
-  try{await NR.presence({nm:myName(),role:'p',t:Date.now()})}catch(e){}
+  try{await NR.presence({nm:myName(),role:'p',t:Date.now(),fl:myFlag()})}catch(e){}
   $('#btnJoin').disabled=true;closeMenu();toast('بندوّر على الغرفة...');
   const t0=Date.now();
   const iv=setInterval(()=>{
@@ -183,13 +197,10 @@ function buildMap(){
     const p=sv('path',{d:t.d,class:'tp','data-id':id,tabindex:'-1'});gP.append(p);
     const l=sv('text',{class:'lb','text-anchor':'middle'});l.textContent=t.n;gL.append(l);
     const m=sv('g',{class:'mk'});
-    const bd=sv('circle',{r:9,style:'fill:var(--surface);stroke:var(--ink);stroke-width:1.5'});
-    const nm=sv('text',{y:4,'text-anchor':'middle','font-size':11,'font-weight':600,style:'fill:var(--ink);font-family:var(--fd)'});
-    const cs=sv('path',{d:'M0 -9C5 -2 8 1 8 4.5A8 8 0 0 1 -8 4.5C-8 1 -5 -2 0 -9Z',style:'fill:var(--surface);stroke:var(--ink);stroke-width:1.4;stroke-linejoin:round',display:'none'});
-    const pg=sv('g',{});
+    const fg=sv('g',{class:'fg'}),pg=sv('g',{});
     for(let k=0;k<4;k++)pg.append(sv('rect',{x:-11+k*6,y:10,width:5,height:5,rx:1,style:'fill:none;stroke:var(--ink);stroke-width:1.2',display:'none'}));
-    m.append(bd,cs,nm,pg);gM.append(m);
-    MAP[id]={p,l,m,bd,nm,cs,pg};
+    m.append(fg,pg);gM.append(m);
+    MAP[id]={p,l,m,fg,pg};
   });
   svg.append(gP,gL,gM);
   setVB();
@@ -211,13 +222,20 @@ function updateScale(){
     M.l.style.display=show?'':'none';
     M.l.setAttribute('x',cx);M.l.setAttribute('y',cy-(M.owned&&show?4/scale:-3/scale));M.l.setAttribute('font-size',(11.5/scale).toFixed(2));
     M.l.style.strokeWidth=(3/scale)+'px';
-    const off=show&&M.owned?17/scale:0;
+    const off=show&&M.owned?22/scale:8/scale;
     M.m.setAttribute('transform',`translate(${cx} ${cy+off}) scale(${(1/scale).toFixed(4)})`);
   });
 }
 function zoomBy(f,fx=.5,fy=.5){
   const cx=vb[0]+vb[2]*fx,cy=vb[1]+vb[3]*fy;
   vb[2]*=f;vb[3]*=f;vb[0]=cx-vb[2]*fx;vb[1]=cy-vb[2]/(GEO.w/GEO.h)*fy;setVB();
+}
+function fitTo(ids){
+  if(!ids.length){vb=[0,0,GEO.w,GEO.h];setVB();return}
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  ids.forEach(id=>{const b=GEO.t[id].bb;x0=Math.min(x0,b[0]);y0=Math.min(y0,b[1]);x1=Math.max(x1,b[0]+b[2]);y1=Math.max(y1,b[1]+b[3])});
+  const ar=GEO.w/GEO.h;
+  setView((x0+x1)/2,(y0+y1)/2,Math.min(Math.max((x1-x0)*1.25,(y1-y0)*1.25*ar,120),GEO.w));
 }
 function setView(cx,cy,w){vb[2]=w;vb[3]=w/(GEO.w/GEO.h);vb[0]=cx-vb[2]/2;vb[1]=cy-vb[3]/2;setVB()}
 function mapEvents(){
@@ -262,7 +280,20 @@ function describe(id){
 }
 function onTile(id){
   $('#cap').textContent=S?describe(id):tname(id);
-  if(canClaim()&&validFor(myIdx()).includes(id)){pickTile(id);renderPanel();updateMap()}
+  if(S&&S.ph==='sp'){trySource(id);return}
+  if(canClaim()&&validFor(myIdx()).includes(id)){pickTile(id);refresh()}
+}
+function refresh(){renderPanel();renderBar();updateMap()}
+function spProblem(me,t){
+  const o=S.ow[t];
+  if(o!==undefined&&o!==me)return 'المحافظة دي اتاخدت، اختار غيرها.';
+  if(GEO.t[t].adj.some(a=>S.ow[a]!==undefined&&S.ow[a]!==me))return 'قريبة قوي من منبع لاعب تاني، اختار محافظة أبعد.';
+  return '';
+}
+function trySource(id){
+  const me=myIdx();if(me<0||S.lk.includes(me))return;
+  const pr=spProblem(me,id);if(pr){toast(pr);return}
+  SND.click();send({k:'s',t:id});
 }
 function pickTile(id){
   if(id===sel){sel=sel2;sel2=null}
@@ -278,22 +309,26 @@ function updateMap(){
     M.owned=o!==undefined;
     M.p.classList.toggle('own',M.owned);
     if(M.po!==o&&M.po!==undefined&&M.owned){M.p.classList.remove('fl');void M.p.getBoundingClientRect();M.p.classList.add('fl')}
+    const plant=M.owned&&M.po!==o;
     M.po=o;
     M.p.style.fill=M.owned?COLV[S.pl[o].ci]:'';
     M.p.classList.toggle('tgt',V.includes(id)&&sel!==id&&sel2!==id);
+    M.p.classList.toggle('bt',V.includes(id)&&o!==undefined);
     M.p.classList.toggle('sel',sel===id||sel2===id);
     M.l.classList.toggle('own',M.owned);
     M.l.style.fill=M.owned?INKV[S.pl[o].ci]:'';
     M.m.style.display=M.owned?'':'none';
     if(M.owned){
-      const castle=S.pl[o].cs===id;
-      M.cs.setAttribute('display',castle?'':'none');
-      M.bd.setAttribute('display',castle?'none':'');
-      M.nm.textContent=String(o+1);
-      M.nm.setAttribute('y',castle?20:4);
-      M.nm.style.fill='var(--ink)';
+      const pl=S.pl[o],castle=pl.cs===id,key=o+'|'+((pl.fl|0)%8)+'|'+(castle?1:0);
+      if(M.fk!==key){
+        M.fk=key;M.fg.textContent='';M.fg.setAttribute('transform','scale('+(castle?1.35:1)+')');
+        M.fg.append(sv('line',{x1:0,y1:2,x2:0,y2:-22,style:'stroke:var(--ink);stroke-width:2;stroke-linecap:round'}),
+          sv('path',{d:'M0 -22H17L13.5 -15.5L17 -9H0Z',style:`fill:${COLV[pl.ci]};stroke:var(--ink);stroke-width:1.2;stroke-linejoin:round`}),
+          sv('path',{d:GLY[(pl.fl|0)%8],transform:'translate(7.5 -15.5)',style:'fill:'+INKV[pl.ci]}));
+      }
+      if(plant){M.fg.classList.remove('plant');void M.fg.getBoundingClientRect();M.fg.classList.add('plant')}
       M.pg.querySelectorAll('rect').forEach((r,k)=>{r.setAttribute('display',castle?'':'none');r.style.fill=k<(S.ht[id]||0)?'var(--bad)':'var(--surface)'});
-      M.pg.setAttribute('transform',castle?'translate(0 5)':'');
+      M.pg.setAttribute('transform',castle?'translate(0 -2)':'');
     }
   });
   updateScale();
@@ -308,11 +343,11 @@ function tilesCount(i){return Object.values(S.ow).filter(v=>v===i).length}
 function logText(e){
   const [k,a,t,x,y]=e;
   switch(k){
-    case 'cap':return `${pname(a)} غمر ${tname(t)} بالمعرفة`;
-    case 'take':return `${pname(a)} غمر ${tname(t)} وأخدها من ${pname(x)}`;
-    case 'def':return `${pname(x)} صدّ غمر ${pname(a)} لـ ${tname(t)}`;
-    case 'hit':return `${pname(a)} أصاب منبع ${pname(x)} في ${tname(t)} (${y} من 4)`;
-    case 'fall':return `${pname(a)} جفّف منبع ${pname(x)} وغمر ${tname(t)}`;
+    case 'cap':return `${pname(a)} زرع علمه في ${tname(t)}`;
+    case 'take':return `⚔ ${pname(a)} هاجم ${tname(t)} ضد ${pname(x)} وكسب المعركة`;
+    case 'def':return `⚔ ${pname(a)} هاجم ${tname(t)} ضد ${pname(x)} — ${pname(x)} صدّه (+3)`+(y?` و${pname(a)} خسر ${y} نقاط`:'');
+    case 'hit':return `⚔ ${pname(a)} أصاب منبع ${pname(x)} في ${tname(t)} (${y} من 4)`;
+    case 'fall':return `⚔ ${pname(a)} جفّف منبع ${pname(x)} وزرع علمه في ${tname(t)}`;
     case 'skip':return `${pname(a)} فوّت دوره`;
     case 'aid':return `${pname(a)} خد تلميح زيادة عشان منبعه قرب يجف`;
     default:return `${pname(a)}: غمر ${tname(t)} ما اتنفّذش`;
@@ -325,7 +360,17 @@ function render(){
   if(S.ph==='lobby'){showScreens('lobby');renderLobby();return}
   showScreens(S.ph==='over'?'over':'', 'game');
   if(!MAP){buildMap()}
-  renderScore();renderPanel();updateMap();
+  const view={sp:'sp',q:'q',claim:'claim',rev:'res',over:'over'}[S.ph]||'q';
+  const g=$('#game');
+  if(g.dataset.view!==view){peek=false;g.classList.remove('peek')}
+  g.dataset.view=view;
+  renderScore();renderPanel();renderBar();updateMap();
+  const fk=S.ph+(S.ph==='sp'?'':S.n);
+  if(fitKey!==fk){
+    fitKey=fk;
+    if(S.ph==='claim'&&canClaim())fitTo(validFor(myIdx()));
+    else if(S.ph==='sp'||S.ph==='claim'||S.ph==='rev'){vb=[0,0,GEO.w,GEO.h];setVB()}
+  }
   if(S.ph==='over')renderOver();
   tick();
 }
@@ -355,16 +400,44 @@ function renderScore(){
   S.pl.forEach((p,i)=>{
     const castle=p.cs&&!p.out;
     let tag='';
-    if(p.out)tag='خرج';else if(p.gone)tag='غاب';else if(S.ph==='q')tag=S.ans[i]?'أجاب ✓':'بيفكر';
+    if(p.out)tag='خرج';else if(p.gone)tag='غاب';else if(S.ph==='sp')tag=(S.lk||[]).includes(i)?'ثبّت ✓':'بيختار';else if(S.ph==='q')tag=S.ans[i]?'أجاب ✓':'بيفكر';
     else if(S.rv&&S.ph!=='lobby')tag=S.rv.ch[i]===S.rv.ci?'صح ✓'+((S.rv.pt&&S.rv.pt[i])?' +'+S.rv.pt[i]:''):(S.rv.ch[i]<0?'ما جاوبش':'غلط ✗');
     box.append(h('div',{class:'sc'+(i===me?' me':'')+(p.out?' out':'')},
       h('div',{class:'nm'},dot(i),h('span',{class:'t',text:p.nm+(i===me?' (أنت)':'')})),
-      h('div',{class:'st'},h('span',{class:'num',text:tilesCount(i)+' محافظة · '+(p.pts||0)+' نقطة'})),
+      h('div',{class:'st'},h('span',{class:'num',text:totalOf(i)+' نقطة · '+tilesCount(i)+' محافظة'})),
       h('div',{class:'prog','aria-hidden':'true'},h('i',{style:`width:${tilesCount(i)/GEO.ids.length*100}%;background:${COLV[p.ci]}`})),
       h('div',{class:'st'},
         castle?h('span',{class:'pips','aria-label':'ضربات المنبع '+(S.ht[p.cs]||0)+' من 4'},[0,1,2,3].map(k=>h('i',{class:k<(S.ht[p.cs]||0)?'f':''})),h('span',{style:'margin-inline-start:6px',text:'منبع'})):h('span',{text:p.out?'المنبع جفّ':''}),
         h('span',{class:(p.cb||0)>=3?'flame':'',text:((p.cb||0)>=3?'🔥'+p.cb+' ':'')+tag}))));
   });
+}
+function ringEl(){const t=h('span',{class:'ring',id:'ring'});t.innerHTML='<svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" class="rb"/><circle cx="22" cy="22" r="19" class="rf" id="tring" transform="rotate(-90 22 22)"/></svg><b id="tnum" class="num"></b>';return t}
+function renderBar(){
+  const b=$('#mbar');b.textContent='';if(!S){b.hidden=true;return}
+  const me=myIdx();let on=false;
+  if(S.ph==='sp'){
+    on=true;
+    const locked=me>=0&&S.lk.includes(me),mine=me>=0?S.pl[me].cs:'';
+    b.append(ringEl(),h('div',{class:'bt'},h('b',{text:me<0?'اللاعبين بيختاروا منابعهم':locked?'تم التثبيت ✓':'اختار من الخريطة المحافظة اللي هتبدأ منها 🚩'}),
+      h('span',{class:'small muted',text:me<0?'':locked?'بانتظار الباقي':mine?'اخترت '+tname(mine)+'. تقدر تغيّر أو تثبّت.':'محافظة فاضية وبعيدة عن منبع أي لاعب.'})),
+      me>=0&&!locked?h('button',{class:'btn sm',disabled:!mine,onclick:()=>{SND.click();send({k:'l'})},text:mine?'ثبّت':'اختار'}):null);
+  }else if(S.ph==='claim'){
+    on=true;const can=canClaim();
+    if(can){
+      const V=validFor(me);let sub='المحافظات المنبّضة هي اللي تقدر تغمرها. الحمرا معناها معركة.';
+      if(sel){const o=S.ow[sel];sub=tname(sel)+': '+(o===undefined?'فاضية':'⚔ معركة ضد '+pname(o)+(S.pl[o].cs===sel?' (منبعه)':'')+' — لو خسرت بتخسر 4 نقاط')}
+      b.append(ringEl(),h('div',{class:'bt'},h('b',{text:S.gd?'⭐ سؤال ذهبي: اختار محافظتين (أو واحدة)':'اختار محافظة تغمرها 🚩'}),h('span',{class:'small muted',text:sub})),
+        h('button',{class:'btn sm',disabled:!sel,onclick:claimNow,text:sel?'ثبّت':'اختار'}));
+      b.append(h('div',{class:'tgts sr'},V.map(t=>h('button',{class:'tg','aria-pressed':(sel===t||sel2===t)?'true':'false',onclick:()=>{pickTile(t);$('#cap').textContent=describe(t);refresh()}},tname(t)+' '+tgtInfo(t)))));
+    }else{
+      const elig=S.cl.el;
+      b.append(ringEl(),h('div',{class:'bt'},h('b',{text:me>=0&&elig.includes(me)?'تم تثبيت اختيارك ✓':(me>=0&&S.rv.ch[me]>=0&&S.rv.ch[me]!==S.rv.ci?'إجابتك مش صح، مفيش غمر المرة دي':'اللي جاوبوا صح بيختاروا دلوقتي')}),
+        h('span',{class:'small muted',text:'بيختاروا: '+elig.map(i=>pname(i)+(S.cl.dn.includes(i)?' ✓':'')).join('، ')})));
+    }
+  }else if(S.ph==='q'&&peek){
+    on=true;b.append(h('div',{class:'bt'},h('b',{text:'الخريطة'})),h('button',{class:'btn sm',onclick:()=>{peek=false;$('#game').classList.remove('peek');renderBar()},text:'↩ السؤال'}));
+  }
+  b.hidden=!on;
 }
 function optButtons(interactive){
   const q=S.q,rv=S.rv,me=myIdx();
@@ -408,7 +481,7 @@ function renderPanel(){
     h('span',{class:'chip num',text:`سؤال ${S.n} من ${S.N}`}),
     h('span',{class:'chip',text:q.c}),
     S.gd?h('span',{class:'chip gold',text:'⭐ سؤال ذهبي ×2'}):null,
-    q.l?h('span',{class:'chip',text:LVL[q.l]}):null,timer));
+    q.l?h('span',{class:'chip',text:LVL[q.l]}):null,S.ph==='q'?timer:null));
   box.append(h('div',{class:'qtext',text:q.t}));
   if(S.ph==='q'){
     box.append(h('div',{class:'opts'},optButtons(mine&&choice<0)));
@@ -418,6 +491,7 @@ function renderPanel(){
         h('button',{class:'btn ghost sm',disabled:left<=0||used||vis<=2,onclick:()=>{SND.click();send({k:'f',n:S.n})},text:`حذف إجابتين (${left})`}),
         h('span',{class:'small muted',text:'بيضيف 3 ثواني على وقتك'})));
     }
+    box.append(h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'btn ghost sm peekbtn',onclick:()=>{peek=true;$('#game').classList.add('peek');renderBar()},text:'🗺 الخريطة'})));
     const need=S.pl.filter(p=>!p.out&&!p.gone).length,got=S.ans.filter(Boolean).length;
     box.append(h('div',{class:'hint'},me<0?'أنت متفرج في الغرفة دي.':!mine?'مش بتشارك في الجولة دي.':choice>=0?`تم تثبيت إجابتك. جاوب ${got} من ${need}.`:(S.ls?'حد جاوب صح! باقي ثواني قليلة.':'اختار إجابتك. الأسرع بياخد نقاط أكتر وأولوية في اختيار المحافظة.')));
     return;
@@ -425,16 +499,7 @@ function renderPanel(){
   box.append(h('div',{class:'opts'},optButtons(false)));
   if(S.ph==='claim'){
     const elig=S.cl.el,done=S.cl.dn;
-    if(canClaim()){
-      const V=validFor(me);
-      box.append(h('div',{class:'hint',text:S.gd?'سؤال ذهبي! اختار محافظتين تغمرهم (أو واحدة).':'إجابتك صح. اختار المحافظة اللي تغمرها بالمعرفة، من الخريطة أو من القايمة دي.'}));
-      box.append(h('div',{class:'tgts'},V.map(t=>h('button',{class:'tg','aria-pressed':(sel===t||sel2===t)?'true':'false',onclick:()=>{pickTile(t);$('#cap').textContent=describe(t);renderPanel();updateMap()}},tname(t),h('small',{text:tgtInfo(t)})))));
-      box.append(h('button',{class:'btn',disabled:!sel,onclick:claimNow,text:sel?'ثبّت: '+tname(sel)+(sel2?' و'+tname(sel2):''):'اختار محافظة الأول'}));
-    }else if(me>=0&&elig.includes(me)){
-      box.append(h('div',{class:'hint',text:'تم تثبيت اختيارك. بانتظار الباقي.'}));
-    }else{
-      box.append(h('div',{class:'hint',text:me>=0&&S.rv.ch[me]>=0&&S.rv.ch[me]!==S.rv.ci?'إجابتك مش صح، مفيش غمر المرة دي.':'اللي جاوبوا صح بيختاروا محافظتهم دلوقتي.'}));
-    }
+    box.append(h('div',{class:'hint',text:canClaim()?'اختار المحافظة من الخريطة وبعدين اضغط ثبّت.':(me>=0&&elig.includes(me)?'تم تثبيت اختيارك. بانتظار الباقي.':(me>=0&&S.rv.ch[me]>=0&&S.rv.ch[me]!==S.rv.ci?'إجابتك مش صح، مفيش غمر المرة دي.':'اللي جاوبوا صح بيختاروا محافظتهم دلوقتي.'))}));
     box.append(h('div',{class:'small muted',text:'بيختاروا: '+elig.map(i=>pname(i)+(done.includes(i)?' ✓':'')).join('، ')}));
     return;
   }
@@ -453,13 +518,13 @@ function renderPanel(){
   }else box.append(h('div',{class:'small muted',style:'margin-top:8px',id:'nextIn'}));
 }
 function renderOver(){
-  const r=S.pl.map((p,i)=>({i,t:tilesCount(i),pts:p.pts||0,ok:p.ok,out:p.out})).sort((a,b)=>(b.t-a.t)||(b.pts-a.pts)||(b.ok-a.ok));
+  const r=S.pl.map((p,i)=>({i,t:tilesCount(i),sc:totalOf(i),ok:p.ok,out:p.out})).sort((a,b)=>(a.out-b.out)||(b.sc-a.sc)||(b.t-a.t)||(b.ok-a.ok));
   const alive=S.pl.filter(p=>!p.out).length;
   $('#ovTitle').textContent=S.win>=0?'الفايز: '+pname(S.win):'انتهت اللعبة';
   const box=$('#ovRank');box.textContent='';
   r.forEach((x,k)=>box.append(h('div',{class:'rk'+(k===0?' win':'')},h('div',{class:'pos num',text:String(k+1)}),dot(x.i),
-    h('div',{style:'flex:1;min-width:0'},h('div',{style:'font-weight:600',text:pname(x.i)+(x.i===myIdx()?' (أنت)':'')}),h('div',{class:'small muted num',text:`${x.t} محافظة · ${x.pts} نقطة · ${x.ok} إجابة صح`+(x.out?' · منبعه جفّ':'')})))));
-  $('#ovNote').textContent=alive<=1?'اللعبة خلصت لأن آخر منبع فضل شغال.':`اللعبة خلصت بعد ${S.N} سؤال، والترتيب بعدد المحافظات ثم نقاط السرعة.`;
+    h('div',{style:'flex:1;min-width:0'},h('div',{style:'font-weight:600',text:pname(x.i)+(x.i===myIdx()?' (أنت)':'')}),h('div',{class:'small muted num',text:`${x.sc} نقطة (${S.pl[x.i].pts||0} + ${x.t}×3 محافظات) · ${x.ok} إجابة صح`+(x.out?' · منبعه جفّ':'')})))));
+  $('#ovNote').textContent=alive<=1?'اللعبة خلصت لأن آخر منبع فضل شغال.':`اللعبة خلصت بعد ${S.N} سؤال، والفايز بأعلى مجموع: النقاط + 3 لكل محافظة.`;
   $('#btnAgain').hidden=!isHost();
   if(!isHost())$('#ovNote').textContent+=' في انتظار صاحب الغرفة يبدأ ريماتش.';
 }
