@@ -275,7 +275,14 @@ details.how p{margin:.2rem 0 0}
       </div>
       <div class="notice" id="joinNote" hidden style="margin-top:8px"></div>
     </div>
-    <div class="field"><label>عدد الأسئلة</label>
+    <div class="field"><label>مستوى الأسئلة</label>
+          <div class="seg" id="segD0" role="group">
+            <button data-v="0" aria-pressed="true">مختلط</button>
+            <button data-v="1" aria-pressed="false">سهل</button>
+            <button data-v="2" aria-pressed="false">متوسط</button>
+            <button data-v="3" aria-pressed="false">صعب</button>
+          </div></div>
+        <div class="field"><label>عدد الأسئلة</label>
       <div class="seg" id="segN0" role="group">
         <button data-v="10" aria-pressed="false">10</button>
         <button data-v="15" aria-pressed="true">15</button>
@@ -326,6 +333,7 @@ details.how p{margin:.2rem 0 0}
         <button class="pc" data-v="lab"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 6h10M21 6v13L9 40a3 3 0 0 0 2.7 4.4h24.6A3 3 0 0 0 39 40L27 19V6"/><path d="M14 33h20" /><circle cx="21" cy="38" r="1.4" fill="currentColor"/><circle cx="28" cy="36" r="1.4" fill="currentColor"/></svg><b>معمل</b><span>تربة وخرسانة وأسفلت وركام وحسابات</span></button>
         <button class="pc" data-v="gen"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="24" cy="24" r="18"/><path d="M6 24h36M24 6c-7 5-7 31 0 36M24 6c7 5 7 31 0 36"/></svg><b>ثقافة عامة</b><span>تاريخ وفن وجغرافيا وعلوم ورياضة وحساب</span></button>
         <button class="pc" data-v="mix"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15h8c9 0 11 18 20 18h8M6 33h8c3 0 5-2 7-5M28 20c2-3 4-5 6-5h8"/><path d="M38 10l4 5-4 5M38 28l4 5-4 5"/></svg><b>مختلط</b><span>من الاتنين مع بعض</span></button>
+        <button class="pc" data-v="fam"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M24 40C10 30 6 22 6 16a9 9 0 0 1 18-2 9 9 0 0 1 18 2c0 6-4 14-18 24Z"/></svg><b>عائلي</b><span>أطفال وأكل وأمثال وفن ومحافظات</span></button>
       </div>
     </div>
     <div class="card stack" id="pickB" hidden>
@@ -357,6 +365,14 @@ details.how p{margin:.2rem 0 0}
             <button data-v="lab" aria-pressed="false">معمل</button>
             <button data-v="gen" aria-pressed="false">عام</button>
             <button data-v="mix" aria-pressed="true">مختلط</button>
+            <button data-v="fam" aria-pressed="false">عائلي</button>
+          </div></div>
+        <div class="field"><label>مستوى الأسئلة</label>
+          <div class="seg" id="segD" role="group">
+            <button data-v="0" aria-pressed="true">مختلط</button>
+            <button data-v="1" aria-pressed="false">سهل</button>
+            <button data-v="2" aria-pressed="false">متوسط</button>
+            <button data-v="3" aria-pressed="false">صعب</button>
           </div></div>
         <div class="field"><label>عدد الأسئلة</label>
           <div class="seg" id="segN" role="group">

@@ -2,8 +2,8 @@
 const BANK=__BANK__;
 const GEO=__GEO__;
 const $=s=>document.querySelector(s);
-const CAT={soil:'تربة',concrete:'خرسانة',asphalt:'أسفلت',aggregate:'ركام',labcalc:'حسابات المعمل',history:'تاريخ',arts:'فن وثقافة',geography:'جغرافيا',science:'علوم',sports:'رياضة',math:'حساب',easy:'معلومات عامة'};
-const LABC=['soil','concrete','asphalt','aggregate','labcalc'], GENC=['history','arts','geography','science','sports','math','easy'];
+const CAT={soil:'تربة',concrete:'خرسانة',asphalt:'أسفلت',aggregate:'ركام',labcalc:'حسابات المعمل',history:'تاريخ',arts:'فن وثقافة',geography:'جغرافيا',science:'علوم',sports:'رياضة',math:'حساب',easy:'معلومات عامة',kids:'أطفال وعائلة',food:'أكل ومطبخ',egypt:'محافظات وتراث',proverb:'أمثال شعبية',cinema:'فن وترفيه'};
+const LABC=['soil','concrete','asphalt','aggregate','labcalc'], GENC=['history','arts','geography','science','sports','math','easy','food','egypt','proverb','cinema','kids'], FAMC=['kids','kids','food','food','egypt','egypt','proverb','proverb','cinema','cinema','easy','easy','sports','geography'];
 const LET=['أ','ب','ج','د'];
 const LVL=['','سهل','متوسط','صعب'];
 const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};

@@ -93,6 +93,7 @@ function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeou
 function showScreens(...ids){['home','pick','lobby','game','over','review','profile'].forEach(s=>$('#'+s).hidden=!ids.includes(s));$('#btnHome').hidden=ids.includes('home');$('#btnMenu').hidden=!(ids.includes('home')||ids.includes('pick'));closeMenu()}
 function openMenu(){$('#scrim').hidden=false;$('#drawer').hidden=false;$('#btnMenu').setAttribute('aria-expanded','true');$('#btnCloseMenu').focus()}
 function closeMenu(){if($('#drawer').hidden)return;$('#scrim').hidden=true;$('#drawer').hidden=true;$('#btnMenu').setAttribute('aria-expanded','false')}
+const savedD=()=>+store.get('qm_d',0)||0;
 const savedN=()=>+store.get('qm_n',15)||15;
 function pickStep(b){$('#pickA').hidden=!!b;$('#pickB').hidden=!b;document.querySelectorAll('#modeCards .pc').forEach(c=>c.setAttribute('aria-pressed',c.dataset.v===pickedMode))}
 function applyTheme(v){const r=document.documentElement;if(v==='light'||v==='dark')r.setAttribute('data-theme',v);else r.removeAttribute('data-theme');document.querySelectorAll('#segTheme button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===v))}
@@ -148,7 +149,7 @@ async function createRoom(){
   wire();mode='host';roomCode=code;
   try{await NR.presence({nm:myName(),role:'host',t:Date.now(),fl:myFlag()})}catch(e){}
   newHost(code,s=>NR.emit('h2c',JSON.parse(s)).catch(()=>{}));
-  H.syncRoster();H.setOpt('mode',pickedMode);H.setOpt('N',savedN());
+  H.syncRoster();H.setOpt('mode',pickedMode);H.setOpt('df',savedD());H.setOpt('N',savedN());
 }
 async function joinRoom(){
   if(!ROOM||mode!=='home')return;
@@ -171,7 +172,7 @@ function startSolo(){
   store.set('qm_name',myName());
   mode='solo';roomCode='';
   newHost('solo',null,true);
-  H.syncRoster();H.addCpu(2);H.addCpu(2);H.setOpt('mode',pickedMode);H.setOpt('N',savedN());H.start();
+  H.syncRoster();H.addCpu(2);H.addCpu(2);H.setOpt('mode',pickedMode);H.setOpt('df',savedD());H.setOpt('N',savedN());H.start();
 }
 async function leaveAll(){
   if(H){H.stop();H=null}
@@ -392,6 +393,7 @@ function renderLobby(){
   if(host)[1,2,3].forEach(l=>cb.append(h('button',{class:'btn ghost sm',disabled:S.pl.length>=4,onclick:()=>H.addCpu(l),text:'+ كمبيوتر '+LVL[l]})));
   document.querySelectorAll('#segMode button').forEach(b=>{b.setAttribute('aria-pressed',b.dataset.v===S.mode);b.disabled=!host});
   document.querySelectorAll('#segN button').forEach(b=>{b.setAttribute('aria-pressed',+b.dataset.v===S.N);b.disabled=!host});
+  document.querySelectorAll('#segD button').forEach(b=>{b.setAttribute('aria-pressed',+b.dataset.v===(S.df||0));b.disabled=!host});
   $('#btnStart').hidden=!host;$('#btnStart').disabled=S.pl.length<2;
   $('#lbWait').textContent=host?(S.pl.length<2?'محتاج لاعب تاني أو كمبيوتر عشان تبدأ.':''):'في انتظار صاحب الغرفة يبدأ اللعب.';
 }
@@ -620,6 +622,8 @@ function init(){
   $('#btnCopy').onclick=async()=>{try{await navigator.clipboard.writeText(roomCode.toUpperCase());toast('تم نسخ الكود.')}catch(e){toast('الكود: '+roomCode.toUpperCase())}};
   document.querySelectorAll('#segMode button').forEach(b=>b.onclick=()=>H&&H.setOpt('mode',b.dataset.v));
   document.querySelectorAll('#segN button').forEach(b=>b.onclick=()=>H&&H.setOpt('N',b.dataset.v));
+  document.querySelectorAll('#segD button').forEach(b=>b.onclick=()=>H&&H.setOpt('df',b.dataset.v));
+  document.querySelectorAll('#segD0 button').forEach(b=>{b.setAttribute('aria-pressed',+b.dataset.v===savedD());b.onclick=()=>{store.set('qm_d',+b.dataset.v);document.querySelectorAll('#segD0 button').forEach(x=>x.setAttribute('aria-pressed',x===b))}});
   $('#btnReview').onclick=()=>{showScreens('review');renderReview()};
   $('#btnProfile').onclick=()=>{showScreens('profile');renderProfile()};
   document.querySelectorAll('#rxbar button').forEach(b=>b.onclick=()=>{SND.click();send({k:'r',e:+b.dataset.e})});

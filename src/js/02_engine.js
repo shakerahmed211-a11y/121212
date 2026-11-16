@@ -7,7 +7,7 @@ const CPU_P=[0,.5,.7,.88], CPU_T=[null,[8,16],[5,11],[3,8]];
 function cleanName(s){return String(s||'').replace(/[\u0000-\u001f​-‏‪-‮⁦-⁩]/g,'').trim().slice(0,18)}
 
 function makeHost(code,emit,onLocal,getPeers,meFn){
-  const st={ph:'lobby',code,mode:'mix',N:15,n:0,pl:[],ow:{},ht:{},lk:[],q:null,ans:[],cl:null,rv:null,rem:0,dur:0,win:-1,hd:[],hf:{},ls:0,nx:[],gd:0,rx:null};
+  const st={ph:'lobby',code,mode:'mix',df:0,N:15,n:0,pl:[],ow:{},ht:{},lk:[],q:null,ans:[],cl:null,rv:null,rem:0,dur:0,win:-1,hd:[],hf:{},ls:0,nx:[],gd:0,rx:null};
   const hs={used:new Set(),qa:-1,qStart:0,ans:{},claims:{},tm:null,cpuT:[],dl:0,hb:null,cpuSeq:0,rxS:0,rxT:{},pen:{},cpuQ:[],first:false,lc:false};
 
   function clearT(){clearTimeout(hs.tm);hs.cpuT.forEach(clearTimeout);hs.cpuT=[]}
@@ -55,7 +55,7 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
     broadcast();
   }
   function removeCpu(idx){ if(st.ph==='lobby'&&st.pl[idx]&&st.pl[idx].cpu){st.pl.splice(idx,1);broadcast()} }
-  function setOpt(k,v){ if(st.ph!=='lobby')return; if(k==='mode'&&['lab','gen','mix'].includes(v))st.mode=v; if(k==='N'&&[10,15,20,30,40].includes(+v))st.N=+v; broadcast(); }
+  function setOpt(k,v){ if(st.ph!=='lobby')return; if(k==='mode'&&['lab','gen','mix','fam'].includes(v))st.mode=v; if(k==='df'&&[0,1,2,3].includes(+v))st.df=+v; if(k==='N'&&[10,15,20,30,40].includes(+v))st.N=+v; broadcast(); }
 
   /* ----- game ----- */
   function start(){
@@ -101,14 +101,16 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
   }
   function choose(){
     // easy general-knowledge questions get extra weight so everyone can answer some
-    const cats=st.mode==='lab'?LABC:st.mode==='gen'?[...GENC,'easy','easy']:[...LABC,...GENC,'easy','easy'];
+    let cats=st.mode==='lab'?LABC:st.mode==='fam'?FAMC:st.mode==='gen'?[...GENC,'easy','easy']:[...LABC,...GENC,'easy','easy'];
+    if(st.df===1)cats=cats.filter(c=>c!=='labcalc'&&c!=='math'); // no calculations on the easy level
+    if(st.df){const ok=cats.filter(c=>c==='labcalc'||c==='math'?st.df>1:(BYCAT[c]||[]).some(i=>BANK[i].l===st.df));if(ok.length)cats=ok}
     const seen=new Set(store.get('qm_seen',[]));
     for(let tries=0;tries<30;tries++){
       const c=pick(cats);
       if(c==='labcalc'||c==='math'){const q=genQuestion(c);q.dur=qdur(q,true);return q}
       const all=BYCAT[c]||[];
-      let pool=all.filter(i=>!hs.used.has(i)&&!seen.has(i));
-      if(!pool.length){ pool=all.filter(i=>!hs.used.has(i)); all.forEach(i=>seen.delete(i)); }
+      let pool=all.filter(i=>!hs.used.has(i)&&!seen.has(i)&&(!st.df||BANK[i].l===st.df));
+      if(!pool.length){ pool=all.filter(i=>!hs.used.has(i)&&(!st.df||BANK[i].l===st.df)); all.forEach(i=>seen.delete(i)); }
       if(!pool.length)continue;
       const i=pick(pool);hs.used.add(i);seen.add(i);
       const b=BANK[i],ord=shuf([0,1,2,3]);

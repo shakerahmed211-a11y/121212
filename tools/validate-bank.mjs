@@ -1,7 +1,7 @@
 // Checks data/bank.json after you edit it: node tools/validate-bank.mjs
 import fs from 'node:fs';
 const bank = JSON.parse(fs.readFileSync(new URL('../data/bank.json', import.meta.url), 'utf8'));
-const cats = new Set(['soil', 'concrete', 'asphalt', 'aggregate', 'history', 'arts', 'geography', 'science', 'sports', 'easy']);
+const cats = new Set(['soil', 'concrete', 'asphalt', 'aggregate', 'history', 'arts', 'geography', 'science', 'sports', 'easy', 'kids', 'food', 'egypt', 'proverb', 'cinema']);
 const seen = new Set(); let bad = 0;
 bank.forEach((x, i) => {
   const why = [];
