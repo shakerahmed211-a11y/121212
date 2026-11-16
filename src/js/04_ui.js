@@ -10,8 +10,25 @@ const EMB_NAMES=['دايرة','مربع','مثلث','معيّن','نجمة','ص�
 
 function h(t,a,...c){const e=document.createElement(t);if(a)for(const k in a){const v=a[k];if(k==='class')e.className=v;else if(k==='text')e.textContent=v;else if(k.slice(0,2)==='on')e.addEventListener(k.slice(2),v);else if(v===true)e.setAttribute(k,'');else if(v!==false&&v!=null)e.setAttribute(k,v)}c.flat().forEach(x=>{if(x==null||x===false)return;e.append(x&&x.nodeType?x:document.createTextNode(x))});return e}
 /* ---------- sound + haptics ---------- */
-const SND={on:store.get('qm_snd',true),ctx:null,
-  wake(){if(!this.on)return;try{if(!this.ctx){const A=window.AudioContext||window.webkitAudioContext;if(A)this.ctx=new A()}if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume()}catch(e){}},
+const SND={on:store.get('qm_snd',true),musOn:store.get('qm_mus',false),ctx:null,musT:0,musNext:0,musB:0,musN:2,
+  plant(){this.play([[392,.08,0,'triangle'],[587,.16,.07,'triangle']]);this.vib(20)},
+  clash(){this.play([[180,.1,0,'sawtooth'],[240,.1,.07,'square'],[140,.2,.15,'sawtooth']]);this.vib([30,20,50])},
+  musLoop(){
+    clearTimeout(this.musT);
+    if(!this.musOn)return;
+    this.musT=setTimeout(()=>this.musLoop(),600);
+    const c=this.ctx;if(!c||c.state!=='running'||document.hidden){this.musNext=0;return}
+    const SC=[293.66,349.23,392,440,523.25,587.33],BS=[146.83,116.54,130.81,98];
+    if(!this.musNext||this.musNext<c.currentTime)this.musNext=c.currentTime+.1;
+    const tone=(f,t,d,ty,g)=>{const o=c.createOscillator(),gn=c.createGain();o.type=ty;o.frequency.value=f;gn.gain.setValueAtTime(0,t);gn.gain.linearRampToValueAtTime(g,t+.04);gn.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(gn);gn.connect(c.destination);o.start(t);o.stop(t+d+.05)};
+    while(this.musNext<c.currentTime+1.4){
+      const t=this.musNext,b=this.musB++;
+      if(b%8===0)tone(BS[(b/8|0)%4],t,3.2,'triangle',.05);
+      if(Math.random()<.6){this.musN=Math.min(5,Math.max(0,this.musN+pick([-2,-1,-1,1,1,2])));tone(SC[this.musN],t,.9,'sine',.028)}
+      this.musNext+=.45;
+    }
+  },
+  wake(){if(!this.on&&!this.musOn)return;try{if(!this.ctx){const A=window.AudioContext||window.webkitAudioContext;if(A)this.ctx=new A()}if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume()}catch(e){}},
   play(seq){if(!this.on||!this.ctx)return;try{const c=this.ctx,t0=c.currentTime;seq.forEach(([f,d,t,ty])=>{const o=c.createOscillator(),g=c.createGain();o.type=ty||'sine';o.frequency.value=f;g.gain.setValueAtTime(0,t0+t);g.gain.linearRampToValueAtTime(.09,t0+t+.012);g.gain.exponentialRampToValueAtTime(.0001,t0+t+d);o.connect(g).connect(c.destination);o.start(t0+t);o.stop(t0+t+d+.02)})}catch(e){}},
   vib(p){if(this.on&&navigator.vibrate)try{navigator.vibrate(p)}catch(e){}},
   click(){this.play([[620,.07,0,'triangle']]);this.vib(12)},
@@ -36,11 +53,23 @@ const BADGES=[
   {id:'marathon',n:'ماراثون',d:'اكسب لعبة 30 سؤال أو أكتر'},
   {id:'vet',n:'محارب قديم',d:'العب 10 ألعاب'}];
 const lvlOf=xp=>Math.floor(Math.sqrt(xp/60))+1;
-const loadProf=()=>Object.assign({xp:0,games:0,wins:0,corr:0,combo:0,fast:0,badges:{}},store.get('qm_prof',{}));
+const loadProf=()=>Object.assign({xp:0,games:0,wins:0,corr:0,combo:0,fast:0,badges:{},cs:{},bf:0,aw:0,al:0,dw:0,maxT:0},store.get('qm_prof',{}));
+function recordRound(me){
+  const k=S.q&&S.q.k;if(!k||!S.rv)return;
+  const P=loadProf(),c=P.cs[k]||{n:0,ok:0},right=S.rv.ch[me]===S.rv.ci;
+  c.n++;if(right)c.ok++;P.cs[k]=c;
+  const t=S.rv.tm[me];if(right&&t>0&&(!P.bf||t<P.bf))P.bf=+t;
+  (S.rv.log||[]).forEach(e=>{
+    if(e[0]==='take'||e[0]==='fall'){if(e[1]===me)P.aw++}
+    else if(e[0]==='def'){if(e[1]===me)P.al++;else if(e[3]===me)P.dw++}
+  });
+  P.maxT=Math.max(P.maxT||0,tilesCount(me));
+  store.set('qm_prof',P);
+}
 let GM={caps:0,fall:0,fast:0,gold:0},awarded=false;
 function awardGame(){
   const me=myIdx();if(awarded||me<0||!S||!S.pl[me])return;awarded=true;
-  const p=S.pl[me],P=loadProf(),won=S.win===me;
+  const p=S.pl[me],P=loadProf(),won=S.tm?teamOf(me)===S.wt:S.win===me;
   const gain=20+totalOf(me)+(won?40:0);
   const l0=lvlOf(P.xp);
   P.xp+=gain;P.games++;if(won)P.wins++;P.corr+=p.ok;P.combo=Math.max(P.combo,p.mc||0);P.fast+=GM.fast;
@@ -54,6 +83,15 @@ function awardGame(){
   if(l1>l0)box.append(h('div',{class:'gold',text:'ترقية! بقيت '+TITLES[Math.min(l1-1,TITLES.length-1)]}));
   got.forEach(b=>box.append(h('div',{class:'gold',text:'شارة جديدة: '+b.n+' — '+b.d})));
 }
+function catStats(P){
+  const rows=Object.keys(P.cs).filter(k=>CAT[k]&&P.cs[k].n>0).map(k=>({k,n:P.cs[k].n,ok:P.cs[k].ok,acc:P.cs[k].ok/P.cs[k].n})).sort((a,b)=>b.n-a.n);
+  if(!rows.length)return h('div',{class:'small muted',text:'العب شوية وهتظهر هنا نسبة صحتك في كل فئة.'});
+  const big=rows.filter(r=>r.n>=5).sort((a,b)=>b.acc-a.acc);
+  const box=h('div',{class:'stack',style:'gap:6px'});
+  if(big.length>=2)box.append(h('div',{class:'small',text:'أقوى فئة: '+CAT[big[0].k]+' · أضعف فئة: '+CAT[big[big.length-1].k]}));
+  rows.forEach(r=>box.append(h('div',{class:'row',style:'align-items:center;gap:8px'},h('span',{class:'small',style:'width:96px;flex:none',text:CAT[r.k]}),h('div',{class:'xpbar',style:'flex:1;margin:0'},h('i',{style:'width:'+Math.round(r.acc*100)+'%'})),h('span',{class:'small muted num',style:'width:54px;text-align:end',text:r.ok+'/'+r.n}))));
+  return box;
+}
 function renderProfile(){
   const P=loadProf(),l=lvlOf(P.xp),lo=60*(l-1)*(l-1),hi=60*l*l,box=$('#pfCard');box.textContent='';
   box.append(h('h2',{text:TITLES[Math.min(l-1,TITLES.length-1)]}),
@@ -64,6 +102,14 @@ function renderProfile(){
       h('div',null,h('b',{class:'num',text:String(P.wins)}),h('span',{class:'small muted',text:'فوز'})),
       h('div',null,h('b',{class:'num',text:String(P.corr)}),h('span',{class:'small muted',text:'إجابات صح'})),
       h('div',null,h('b',{class:'num',text:String(P.combo)}),h('span',{class:'small muted',text:'أطول كومبو'}))),
+    h('h3',{text:'لوحة الشرف'}),
+    h('div',{class:'stats'},
+      h('div',null,h('b',{class:'num',text:P.bf?P.bf.toFixed(1)+' ث':'—'}),h('span',{class:'small muted',text:'أسرع إجابة صح'})),
+      h('div',null,h('b',{class:'num',text:String(P.maxT)}),h('span',{class:'small muted',text:'أكتر محافظات في لعبة'})),
+      h('div',null,h('b',{class:'num',text:String(P.aw)}),h('span',{class:'small muted',text:'هجمات ناجحة'})),
+      h('div',null,h('b',{class:'num',text:String(P.dw)}),h('span',{class:'small muted',text:'دفاعات ناجحة'}))),
+    h('h3',{text:'مستواك في كل فئة'}),
+    catStats(P),
     h('h3',{text:'علمك'}),
     h('div',{class:'small muted',text:'العلم بيتزرع على كل محافظة تغمرها. فتح أشكال جديدة كل ما مستواك يزيد.'}),
     h('div',{class:'embs'},EMB_NAMES.map((n,k)=>{const ok=l>=EMB_LV[k],cur=store.get('qm_fl',-1)===k;
@@ -84,13 +130,30 @@ function onPhase(prev,next){
   if(next==='rev'&&prev!=='rev'&&S.rv&&me>=0){
     const ch=S.rv.ch[me];
     if(ch===S.rv.ci){SND.good();if(S.rv.tm[me]>=0&&S.rv.tm[me]<=2)GM.fast++;if(S.gd)GM.gold++}else SND.bad();
-    (S.rv.log||[]).forEach(e=>{if(e[1]===me){if(e[0]==='cap'||e[0]==='take'||e[0]==='fall')GM.caps++;if(e[0]==='fall')GM.fall++}});
+    const lg=S.rv.log||[];
+    if(lg.some(e=>['take','def','hit','fall'].includes(e[0])))setTimeout(()=>SND.clash(),350);else if(lg.some(e=>e[0]==='cap'))setTimeout(()=>SND.plant(),350);
+    recordRound(me);
+    lg.forEach(e=>{if(e[1]===me){if(e[0]==='cap'||e[0]==='take'||e[0]==='fall')GM.caps++;if(e[0]==='fall')GM.fall++}});
   }
-  if(next==='over'&&prev!=='over'){if(me>=0&&S.win===me){SND.win();confetti()}else SND.end();awardGame()}
+  if(next==='over'&&prev!=='over'){if(me>=0&&(S.tm?teamOf(me)===S.wt:S.win===me)){SND.win();confetti()}else SND.end();awardGame()}
 }
 let toastT=0;
 function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3200)}
 function showScreens(...ids){['home','pick','lobby','game','over','review','profile'].forEach(s=>$('#'+s).hidden=!ids.includes(s));$('#btnHome').hidden=ids.includes('home');$('#btnMenu').hidden=!(ids.includes('home')||ids.includes('pick'));closeMenu()}
+const TUT=[['🚩','اختار مكانك','في أول اللعبة بتضغط على الخريطة على المحافظة اللي هتبدأ منها، وعليها بيتزرع علمك.'],
+  ['⚡','جاوب بسرعة','أول إجابة صح بتاخد أكتر نقاط. واللي جاوب صح بيختار من الخريطة محافظة جنب أرضه يغمرها بالمعرفة.'],
+  ['⚔','اهجم بحساب','لو غمرت أرض لاعب تاني بتبقى معركة على نفس السؤال. لو خسرت بتخسر 4 نقاط، ولو الدفاع نجح بياخد 3.'],
+  ['🏆','أعلى مجموع بيكسب','المجموع = نقاطك + 3 لكل محافظة معاك في الآخر. العب لوحدك أو مع صحابك أو في فريقين!']];
+let tutI=0,tutPrev=null;
+function tutGo(i){
+  if(i>=TUT.length){closeTut();return}
+  tutI=i;const [ic,t,p]=TUT[i];
+  $('#tutI').textContent=ic;$('#tutT').textContent=t;$('#tutP').textContent=p;
+  $('#tutNext').textContent=i===TUT.length-1?'يلا نلعب':'التالي';
+  const d=$('#tutD');d.textContent='';TUT.forEach((_,k)=>d.append(h('i',{class:k===i?'on':''})));
+}
+function openTut(){tutPrev=document.activeElement;tutGo(0);$('#tut').hidden=false;$('#tutNext').focus()}
+function closeTut(){store.set('qm_tut',true);$('#tut').hidden=true;if(tutPrev&&tutPrev.focus)try{tutPrev.focus()}catch(e){}}
 function openMenu(){$('#scrim').hidden=false;$('#drawer').hidden=false;$('#btnMenu').setAttribute('aria-expanded','true');$('#btnCloseMenu').focus()}
 function closeMenu(){if($('#drawer').hidden)return;$('#scrim').hidden=true;$('#drawer').hidden=true;$('#btnMenu').setAttribute('aria-expanded','false')}
 const savedD=()=>+store.get('qm_d',0)||0;
@@ -108,7 +171,10 @@ function glyphSvg(f,ci,sz){const e=document.createElementNS(NS,'svg');e.setAttri
 function dot(i){const p=S.pl[i];return h('span',{class:'badge',style:`background:${COLV[p.ci]}`,title:p.nm},glyphSvg(p.fl,p.ci))}
 const totalOf=i=>(S.pl[i].pts||0)+3*tilesCount(i);
 const myFlag=()=>{const f=store.get('qm_fl',-1);return f>=0&&f<8&&lvlOf(loadProf().xp)>=EMB_LV[f]?f:undefined};
-function validFor(i){const s=new Set();Object.keys(S.ow).forEach(t=>{if(S.ow[t]===i)GEO.t[t].adj.forEach(a=>{if(S.ow[a]!==i)s.add(a)})});return [...s]}
+const teamOf=i=>S&&S.tm?TEAMS[S.tm][i]:-1, TN=['أ','ب'];
+const mateU=(i,o)=>o!==undefined&&(o===i||(S.tm&&teamOf(o)===teamOf(i)));
+function validFor(i){const s=new Set();Object.keys(S.ow).forEach(t=>{if(mateU(i,S.ow[t]))GEO.t[t].adj.forEach(a=>{if(!mateU(i,S.ow[a]))s.add(a)})});return [...s]}
+const teamTotal=t=>S.pl.reduce((x,p,i)=>x+(teamOf(i)===t?totalOf(i):0),0);
 
 /* ---------- send / receive ---------- */
 function send(m){
@@ -288,7 +354,7 @@ function refresh(){renderPanel();renderBar();updateMap()}
 function spProblem(me,t){
   const o=S.ow[t];
   if(o!==undefined&&o!==me)return 'المحافظة دي اتاخدت، اختار غيرها.';
-  if(GEO.t[t].adj.some(a=>S.ow[a]!==undefined&&S.ow[a]!==me))return 'قريبة قوي من منبع لاعب تاني، اختار محافظة أبعد.';
+  if(GEO.t[t].adj.some(a=>S.ow[a]!==undefined&&!mateU(me,S.ow[a])))return 'قريبة قوي من منبع لاعب تاني، اختار محافظة أبعد.';
   return '';
 }
 function trySource(id){
@@ -386,7 +452,7 @@ function renderLobby(){
     const p=S.pl[i];
     if(!p){ul.append(h('li',{class:'pitem empty',text:'مكان فاضي'}));continue}
     ul.append(h('li',{class:'pitem'},dot(i),h('span',{style:'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis',text:p.nm}),
-      p.cpu?h('span',{class:'chip',text:'كمبيوتر · '+LVL[p.cpu]}):(i===me?h('span',{class:'chip',text:'أنت'}):null),
+      S.tm?h('span',{class:'chip',text:'فريق '+TN[teamOf(i)]}):null,p.cpu?h('span',{class:'chip',text:'كمبيوتر · '+LVL[p.cpu]}):(i===me?h('span',{class:'chip',text:'أنت'}):null),
       host&&p.cpu?h('button',{class:'btn ghost sm',onclick:()=>H.removeCpu(i),'aria-label':'شيل '+p.nm,text:'شيل'}):null));
   }
   const cb=$('#lbCpu');cb.textContent='';
@@ -394,18 +460,22 @@ function renderLobby(){
   document.querySelectorAll('#segMode button').forEach(b=>{b.setAttribute('aria-pressed',b.dataset.v===S.mode);b.disabled=!host});
   document.querySelectorAll('#segN button').forEach(b=>{b.setAttribute('aria-pressed',+b.dataset.v===S.N);b.disabled=!host});
   document.querySelectorAll('#segD button').forEach(b=>{b.setAttribute('aria-pressed',+b.dataset.v===(S.df||0));b.disabled=!host});
-  $('#btnStart').hidden=!host;$('#btnStart').disabled=S.pl.length<2;
-  $('#lbWait').textContent=host?(S.pl.length<2?'محتاج لاعب تاني أو كمبيوتر عشان تبدأ.':''):'في انتظار صاحب الغرفة يبدأ اللعب.';
+  document.querySelectorAll('#segT button').forEach(b=>{b.setAttribute('aria-pressed',(+b.dataset.v>0)===!!S.tm);b.disabled=!host});
+  $('#btnTeamMix').hidden=!(host&&S.tm);
+  const need=S.tm?4:2;
+  $('#btnStart').hidden=!host;$('#btnStart').disabled=S.pl.length<need;
+  $('#lbWait').textContent=host?(S.pl.length<need?(S.tm?'اللعب فريقين محتاج 4 لاعبين. ضيف كمبيوتر للباقي.':'محتاج لاعب تاني أو كمبيوتر عشان تبدأ.'):''):'في انتظار صاحب الغرفة يبدأ اللعب.';
 }
 function renderScore(){
   const box=$('#score');box.textContent='';const me=myIdx();
+  if(S.tm)box.append(h('div',{class:'sc',style:'grid-column:1/-1;flex-direction:row;justify-content:space-around;font-weight:600'},[0,1].map(t=>h('span',{class:'num',text:'فريق '+TN[t]+': '+teamTotal(t)}))));
   S.pl.forEach((p,i)=>{
     const castle=p.cs&&!p.out;
     let tag='';
     if(p.out)tag='خرج';else if(p.gone)tag='غاب';else if(S.ph==='sp')tag=(S.lk||[]).includes(i)?'ثبّت ✓':'بيختار';else if(S.ph==='q')tag=S.ans[i]?'أجاب ✓':'بيفكر';
     else if(S.rv&&S.ph!=='lobby')tag=S.rv.ch[i]===S.rv.ci?'صح ✓'+((S.rv.pt&&S.rv.pt[i])?' +'+S.rv.pt[i]:''):(S.rv.ch[i]<0?'ما جاوبش':'غلط ✗');
     box.append(h('div',{class:'sc'+(i===me?' me':'')+(p.out?' out':'')},
-      h('div',{class:'nm'},dot(i),h('span',{class:'t',text:p.nm+(i===me?' (أنت)':'')})),
+      h('div',{class:'nm'},dot(i),h('span',{class:'t',text:p.nm+(i===me?' (أنت)':'')+(S.tm?' · '+TN[teamOf(i)]:'')})),
       h('div',{class:'st'},h('span',{class:'num',text:totalOf(i)+' نقطة · '+tilesCount(i)+' محافظة'})),
       h('div',{class:'prog','aria-hidden':'true'},h('i',{style:`width:${tilesCount(i)/GEO.ids.length*100}%;background:${COLV[p.ci]}`})),
       h('div',{class:'st'},
@@ -522,9 +592,10 @@ function renderPanel(){
 function renderOver(){
   const r=S.pl.map((p,i)=>({i,t:tilesCount(i),sc:totalOf(i),ok:p.ok,out:p.out})).sort((a,b)=>(a.out-b.out)||(b.sc-a.sc)||(b.t-a.t)||(b.ok-a.ok));
   const alive=S.pl.filter(p=>!p.out).length;
-  $('#ovTitle').textContent=S.win>=0?'الفايز: '+pname(S.win):'انتهت اللعبة';
+  $('#ovTitle').textContent=S.tm?'الفريق الفايز: '+TN[S.wt]:(S.win>=0?'الفايز: '+pname(S.win):'انتهت اللعبة');
   const box=$('#ovRank');box.textContent='';
-  r.forEach((x,k)=>box.append(h('div',{class:'rk'+(k===0?' win':'')},h('div',{class:'pos num',text:String(k+1)}),dot(x.i),
+  if(S.tm)[S.wt,1-S.wt].forEach((t,k)=>box.append(h('div',{class:'rk'+(k===0?' win':'')},h('div',{class:'pos num',text:String(k+1)}),h('div',{style:'flex:1;min-width:0'},h('div',{style:'font-weight:600',text:'فريق '+TN[t]+' — '+teamTotal(t)+' نقطة'}),h('div',{class:'small muted',text:S.pl.map((p,i)=>teamOf(i)===t?p.nm+' ('+totalOf(i)+')':'').filter(Boolean).join('، ')})))));
+  else r.forEach((x,k)=>box.append(h('div',{class:'rk'+(k===0?' win':'')},h('div',{class:'pos num',text:String(k+1)}),dot(x.i),
     h('div',{style:'flex:1;min-width:0'},h('div',{style:'font-weight:600',text:pname(x.i)+(x.i===myIdx()?' (أنت)':'')}),h('div',{class:'small muted num',text:`${x.sc} نقطة (${S.pl[x.i].pts||0} + ${x.t}×3 محافظات) · ${x.ok} إجابة صح`+(x.out?' · منبعه جفّ':'')})))));
   $('#ovNote').textContent=alive<=1?'اللعبة خلصت لأن آخر منبع فضل شغال.':`اللعبة خلصت بعد ${S.N} سؤال، والفايز بأعلى مجموع: النقاط + 3 لكل محافظة.`;
   $('#btnAgain').hidden=!isHost();
@@ -605,7 +676,15 @@ function init(){
   drawMini();
   $('#inName').value=store.get('qm_name','');
   $('#btnSolo').onclick=startSolo;$('#btnCreate').onclick=createRoom;$('#btnJoin').onclick=joinRoom;
-  $('#btnPlay').onclick=()=>{store.set('qm_name',myName());showScreens('pick');pickStep(false)};
+  $('#btnPlay').onclick=()=>{store.set('qm_name',myName());showScreens('pick');pickStep(false);if(!store.get('qm_tut',false))openTut()};
+  $('#btnTut').onclick=()=>{closeMenu();openTut()};
+  $('#tutNext').onclick=()=>tutGo(tutI+1);$('#tutSkip').onclick=closeTut;
+  addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#tut').hidden)closeTut()});
+  const inv=()=>location.href.split('#')[0].split('?')[0]+'?room='+roomCode;
+  $('#btnLink').onclick=async()=>{try{await navigator.clipboard.writeText(inv());toast('تم نسخ رابط الدعوة.')}catch(e){toast(inv())}};
+  if(navigator.share){$('#btnShare').hidden=false;$('#btnShare').onclick=()=>navigator.share({title:'غمر المعرفة',text:'تعالى نلعب غمر المعرفة! الكود: '+roomCode.toUpperCase(),url:inv()}).catch(()=>{})}
+  document.querySelectorAll('#segMus button').forEach(b=>{b.setAttribute('aria-pressed',(b.dataset.v==='on')===SND.musOn);b.onclick=()=>{SND.musOn=b.dataset.v==='on';store.set('qm_mus',SND.musOn);document.querySelectorAll('#segMus button').forEach(x=>x.setAttribute('aria-pressed',x===b));SND.wake();SND.musLoop()}});
+  SND.musLoop();
   $('#inName').addEventListener('keydown',e=>{if(e.key==='Enter')$('#btnPlay').click()});
   document.querySelectorAll('#modeCards .pc').forEach(c=>c.onclick=()=>{pickedMode=c.dataset.v;store.set('qm_mode',pickedMode);pickStep(true)});
   $('#pickBack').onclick=()=>pickStep(false);
@@ -623,6 +702,8 @@ function init(){
   document.querySelectorAll('#segMode button').forEach(b=>b.onclick=()=>H&&H.setOpt('mode',b.dataset.v));
   document.querySelectorAll('#segN button').forEach(b=>b.onclick=()=>H&&H.setOpt('N',b.dataset.v));
   document.querySelectorAll('#segD button').forEach(b=>b.onclick=()=>H&&H.setOpt('df',b.dataset.v));
+  document.querySelectorAll('#segT button').forEach(b=>b.onclick=()=>H&&H.setOpt('tm',b.dataset.v));
+  $('#btnTeamMix').onclick=()=>H&&H.setOpt('tm',H.st.tm%3+1);
   document.querySelectorAll('#segD0 button').forEach(b=>{b.setAttribute('aria-pressed',+b.dataset.v===savedD());b.onclick=()=>{store.set('qm_d',+b.dataset.v);document.querySelectorAll('#segD0 button').forEach(x=>x.setAttribute('aria-pressed',x===b))}});
   $('#btnReview').onclick=()=>{showScreens('review');renderReview()};
   $('#btnProfile').onclick=()=>{showScreens('profile');renderProfile()};

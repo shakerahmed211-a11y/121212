@@ -2,19 +2,23 @@
 const SP_SEC=15, BATTLE_LOSS=4, DEF_BONUS=3, TILE_PTS=3, CLAIM_SEC=10, REV_MIN=3, CASTLE_HITS=4, LAST_SEC=5, FIFTY=2, PTS=[10,7,5,3], PEN_SEC=3;
 /* seconds for a question: by difficulty (calculations get more), plus reading time for long questions */
 function qdur(q,calc){const len=(q.t||'').length+(q.o||[]).join('').length;const base=calc?30:(q.l===3?20:q.l===1?12:15);return base+Math.min(8,Math.round(len/90))}
+const TEAMS=[null,[0,1,0,1],[0,0,1,1],[0,1,1,0]];
 const CPU_P=[0,.5,.7,.88], CPU_T=[null,[8,16],[5,11],[3,8]];
 
 function cleanName(s){return String(s||'').replace(/[\u0000-\u001f​-‏‪-‮⁦-⁩]/g,'').trim().slice(0,18)}
 
 function makeHost(code,emit,onLocal,getPeers,meFn){
-  const st={ph:'lobby',code,mode:'mix',df:0,N:15,n:0,pl:[],ow:{},ht:{},lk:[],q:null,ans:[],cl:null,rv:null,rem:0,dur:0,win:-1,hd:[],hf:{},ls:0,nx:[],gd:0,rx:null};
+  const st={ph:'lobby',code,mode:'mix',df:0,tm:0,N:15,n:0,pl:[],ow:{},ht:{},lk:[],q:null,ans:[],cl:null,rv:null,rem:0,dur:0,win:-1,hd:[],hf:{},ls:0,nx:[],gd:0,rx:null};
   const hs={used:new Set(),qa:-1,qStart:0,ans:{},claims:{},tm:null,cpuT:[],dl:0,hb:null,cpuSeq:0,rxS:0,rxT:{},pen:{},cpuQ:[],first:false,lc:false};
 
   function clearT(){clearTimeout(hs.tm);hs.cpuT.forEach(clearTimeout);hs.cpuT=[]}
+  function team(i){return st.tm?TEAMS[st.tm][i]:i}
+  function aliveTeams(){return new Set(alive().map(team)).size}
   function alive(){return st.pl.map((p,i)=>i).filter(i=>!st.pl[i].out)}
   function active(){return alive().filter(i=>!st.pl[i].gone)}
   function tilesOf(i){return Object.keys(st.ow).filter(t=>st.ow[t]===i)}
-  function valid(i){const s=new Set();tilesOf(i).forEach(t=>GEO.t[t].adj.forEach(a=>{if(st.ow[a]!==i)s.add(a)}));return [...s]}
+  function mate(i,o){return o!==undefined&&(o===i||(st.tm&&team(o)===team(i)))}
+  function valid(i){const s=new Set();Object.keys(st.ow).forEach(t=>{if(mate(i,st.ow[t]))GEO.t[t].adj.forEach(a=>{if(!mate(i,st.ow[a]))s.add(a)})});return [...s]}
 
   function broadcast(){
     st.rem=Math.max(0,+((hs.dl-Date.now())/1000).toFixed(1));
@@ -55,11 +59,11 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
     broadcast();
   }
   function removeCpu(idx){ if(st.ph==='lobby'&&st.pl[idx]&&st.pl[idx].cpu){st.pl.splice(idx,1);broadcast()} }
-  function setOpt(k,v){ if(st.ph!=='lobby')return; if(k==='mode'&&['lab','gen','mix','fam'].includes(v))st.mode=v; if(k==='df'&&[0,1,2,3].includes(+v))st.df=+v; if(k==='N'&&[10,15,20,30,40].includes(+v))st.N=+v; broadcast(); }
+  function setOpt(k,v){ if(st.ph!=='lobby')return; if(k==='mode'&&['lab','gen','mix','fam'].includes(v))st.mode=v; if(k==='tm'&&[0,1,2,3].includes(+v))st.tm=+v; if(k==='df'&&[0,1,2,3].includes(+v))st.df=+v; if(k==='N'&&[10,15,20,30,40].includes(+v))st.N=+v; broadcast(); }
 
   /* ----- game ----- */
   function start(){
-    if(st.ph!=='lobby'||st.pl.length<2)return false;
+    if(st.ph!=='lobby'||st.pl.length<2||(st.tm&&st.pl.length<4))return false;
     clearT();
     st.ow={};st.ht={};st.lk=[];st.n=0;st.win=-1;hs.used.clear();
     st.pl.forEach(p=>{p.out=0;p.ok=0;p.pts=0;p.cb=0;p.mc=0;p.h=FIFTY;p.gone=0;p.cs=''});
@@ -72,7 +76,7 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
   function spOk(i,t){
     if(typeof t!=='string'||!GEO.t[t])return false;
     if(st.ow[t]!==undefined&&st.ow[t]!==i)return false;
-    return !GEO.t[t].adj.some(a=>st.ow[a]!==undefined&&st.ow[a]!==i);
+    return !GEO.t[t].adj.some(a=>st.ow[a]!==undefined&&!mate(i,st.ow[a]));
   }
   function spFree(i){const c=GEO.ids.filter(t=>spOk(i,t));return c.length?pick(c):null}
   function pickSource(i,t){
@@ -96,7 +100,7 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
   }
   function nextQ(){
     clearT();
-    if(st.n>=st.N||alive().length<=1||active().length===0){endGame();return}
+    if(st.n>=st.N||aliveTeams()<=1||active().length===0){endGame();return}
     startQ();
   }
   function choose(){
@@ -257,12 +261,16 @@ function makeHost(code,emit,onLocal,getPeers,meFn){
     broadcast();
   }
   function score(i){return (st.pl[i].pts||0)+TILE_PTS*tilesOf(i).length}
+  function tscore(t){return st.pl.reduce((x,p,i)=>x+(team(i)===t?score(i):0),0)}
   function ranking(){
     return st.pl.map((p,i)=>({i,t:tilesOf(i).length,sc:score(i),ok:p.ok,out:p.out})).sort((a,b)=>(a.out-b.out)||(b.sc-a.sc)||(b.t-a.t)||(b.ok-a.ok));
   }
   function endGame(){
     clearT();
-    const r=ranking();st.win=r.length?r[0].i:-1;
+    if(st.tm){
+      const ts=[0,1].map(t=>({t,alive:st.pl.some((p,i)=>team(i)===t&&!p.out)?1:0,sc:tscore(t)})).sort((a,b)=>(b.alive-a.alive)||(b.sc-a.sc));
+      st.wt=ts[0].t;st.win=st.pl.findIndex((p,i)=>team(i)===st.wt);
+    }else{const r=ranking();st.win=r.length?r[0].i:-1}
     st.ph='over';st.q=null;st.cl=null;st.dur=0;hs.dl=0;
     broadcast();
   }

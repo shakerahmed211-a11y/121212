@@ -106,6 +106,14 @@ select{font:inherit;color:var(--ink);background:var(--bg);border:1.5px solid var
 .embs button[aria-pressed=true]{border-color:var(--ink);border-width:2.5px}
 .embs button:disabled{opacity:.45}
 #panel:empty{display:none}
+.pitem .chip{white-space:nowrap}
+.modal{position:fixed;inset:0;z-index:50;background:rgba(6,16,26,.72);display:grid;place-items:center;padding:16px}
+.modal[hidden]{display:none}
+.tutc{width:min(420px,100%);text-align:center;align-items:center}
+.tutico{font-size:3.2rem;line-height:1}
+.tdots{display:flex;gap:6px;justify-content:center}
+.tdots i{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.tdots i.on{background:var(--ink)}
 @keyframes dash{to{stroke-dashoffset:-24}}
 .lb{font-family:var(--fb);font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--land);stroke-width:3px;stroke-linejoin:round;pointer-events:none;text-anchor:middle}
 .lb.own{stroke:none}
@@ -301,10 +309,16 @@ details.how p{margin:.2rem 0 0}
         <button data-v="on" aria-pressed="true">شغّال</button>
         <button data-v="off" aria-pressed="false">مكتوم</button>
       </div></div>
+    <div class="field"><label>موسيقى هادية في الخلفية</label>
+      <div class="seg" id="segMus" role="group">
+        <button data-v="on" aria-pressed="false">شغّالة</button>
+        <button data-v="off" aria-pressed="true">مقفولة</button>
+      </div></div>
     <details class="how">
       <summary>إزاي تلعب؟</summary>
       <p class="muted small">كل سؤال عليه مؤقت قصير، وأول واحد يجاوب صح بيقفل الوقت على الباقي في ثواني. الأسرع بياخد نقاط أكتر. في الأول كل لاعب بيختار من الخريطة المحافظة اللي هيبدأ منها وبيزرع عليها علمه. بعد كده اللي يجاوب صح يغمر محافظة مجاورة لأرضه من الخريطة. لو المحافظة تابعة لمنافس بتبقى معركة على نفس السؤال: لو جاوب هو صح وأسرع منك بيصدّك (وبياخد 3 نقاط) وإنت بتخسر 4 نقاط، ولو لأ بتاخدها. المنبع بيجف بعد 4 ضربات ناجحة عليه. الفايز صاحب أعلى مجموع: نقاطك + 3 لكل محافظة معاك في الآخر. تلميح تلقائي بيبهّت إجابة غلط في نص الوقت، ومعاك مرتين تحذف إجابتين (بيضيف 3 ثواني على وقتك). 3 إجابات صح ورا بعض = كومبو 🔥 بنقاط أكتر، وكل 7 أسئلة سؤال ذهبي بنقاط مضاعفة وغمر محافظتين. والتفاعلات السريعة تحت النتيجة.</p>
     </details>
+    <button class="btn ghost" id="btnTut">شرح سريع للعبة</button>
     <button class="btn" id="btnProfile">ملفي ومستواي</button>
     <button class="btn ghost" id="btnReview">مراجعة أسئلة المعمل فنيًا</button>
   </aside>
@@ -354,6 +368,7 @@ details.how p{margin:.2rem 0 0}
         <div id="lbRoomBox">
           <div class="muted small">كود الغرفة، ابعته لأصحابك</div>
           <div class="row"><span class="code" id="lbCode"></span><button class="btn ghost sm" id="btnCopy">نسخ</button><button class="btn sm" id="btnWa">ادعُ صحابك بواتساب</button></div>
+          <div class="row" style="margin-top:6px"><button class="btn ghost sm" id="btnLink">نسخ رابط الدعوة</button><button class="btn ghost sm" id="btnShare" hidden>مشاركة…</button></div>
         </div>
         <ul class="plist" id="lbPlayers"></ul>
         <div class="row" id="lbCpu"></div>
@@ -367,6 +382,12 @@ details.how p{margin:.2rem 0 0}
             <button data-v="mix" aria-pressed="true">مختلط</button>
             <button data-v="fam" aria-pressed="false">عائلي</button>
           </div></div>
+        <div class="field"><label>طريقة اللعب</label>
+          <div class="seg" id="segT" role="group">
+            <button data-v="0" aria-pressed="true">كل واحد لنفسه</button>
+            <button data-v="1" aria-pressed="false">فريقين (2 ضد 2)</button>
+          </div>
+          <div class="row" style="margin-top:6px"><button class="btn ghost sm" id="btnTeamMix" hidden>غيّر توزيع الفرق</button></div></div>
         <div class="field"><label>مستوى الأسئلة</label>
           <div class="seg" id="segD" role="group">
             <button data-v="0" aria-pressed="true">مختلط</button>
@@ -445,3 +466,12 @@ details.how p{margin:.2rem 0 0}
   </section>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div id="tut" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="tutT">
+  <div class="card stack tutc">
+    <div class="tutico" id="tutI" aria-hidden="true"></div>
+    <h2 id="tutT"></h2>
+    <p id="tutP" class="muted"></p>
+    <div class="tdots" id="tutD" aria-hidden="true"></div>
+    <div class="row" style="justify-content:space-between"><button class="btn ghost sm" id="tutSkip">تخطّي</button><button class="btn" id="tutNext">التالي</button></div>
+  </div>
+</div>
