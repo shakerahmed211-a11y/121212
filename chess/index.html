@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14181f">
+<title>محلل الشطرنج</title>
+<style>
+:root{--bg:#12161d;--card:#1b212b;--line:#2c3644;--ink:#eef2f7;--mut:#9aa7b8;--acc:#37d08a;--acc2:#4aa3ff;--warn:#f0a43a;--bad:#ff6b6b;--light:#e9d9b8;--dark:#b0825c}
+@media (prefers-color-scheme:light){:root{--bg:#f4f6f9;--card:#fff;--line:#d5dce6;--ink:#14202e;--mut:#5c6b7e}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,"Segoe UI",Tahoma,sans-serif;padding:max(14px,env(safe-area-inset-top)) 14px 40px}
+main{max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{margin:0;font-size:1.4rem}h2{margin:0 0 8px;font-size:1.05rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,.btn{font:inherit;color:var(--ink);background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:10px 14px;min-height:44px;cursor:pointer}
+button.pri{background:var(--acc);border-color:var(--acc);color:#06210f;font-weight:700}
+button:disabled{opacity:.5;cursor:default}
+button[aria-pressed=true]{border-color:var(--acc);box-shadow:inset 0 0 0 1.5px var(--acc)}
+.mut{color:var(--mut);font-size:.9rem}
+input[type=file]{display:none}
+#boardwrap{position:relative;width:min(100%,540px);margin:0 auto;direction:ltr;touch-action:manipulation}
+#board{display:grid;grid-template-columns:repeat(8,1fr);aspect-ratio:1;border-radius:8px;overflow:hidden;border:2px solid var(--line)}
+.sq{position:relative;display:grid;place-items:center;font-size:clamp(22px,8.2vw,50px);line-height:1;user-select:none;-webkit-user-select:none}
+.sq.l{background:var(--light)}.sq.d{background:var(--dark)}
+.sq.sel{outline:3px solid var(--acc2);outline-offset:-3px}
+.sq.low::after{content:"";position:absolute;inset:3px;border:2px dashed var(--warn);border-radius:4px;pointer-events:none}
+.sq .co{position:absolute;left:2px;bottom:0;font-size:10px;opacity:.55;color:#222}
+.pw{color:#fff;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000,0 0 3px #000}
+.pb{color:#111;text-shadow:0 0 2px rgba(255,255,255,.35)}
+#arrows{position:absolute;inset:0;pointer-events:none;width:100%;height:100%}
+.pal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;direction:ltr}
+.pal button{padding:4px;font-size:1.7rem;line-height:1;min-height:44px}
+.pal .pw{background:#7d8794}
+#res .mv{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-top:1px solid var(--line)}
+#res .mv:first-child{border-top:0}
+#res .san{font-weight:700;font-size:1.25rem;direction:ltr}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.prev{position:relative;width:100%;touch-action:none}
+.prev canvas{width:100%;display:block;border-radius:10px}
+video{width:100%;border-radius:10px;background:#000;display:block}
+#vwrap{position:relative}#vwrap canvas{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+.tl{max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:4px}
+.tl button{text-align:start;min-height:38px;padding:6px 10px}
+.opts label{display:inline-flex;gap:6px;align-items:center;margin-inline-end:10px}
+input[type=text]{width:100%;font:inherit;direction:ltr;padding:8px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink)}
+.err{color:var(--bad)}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <h1>♞ محلل الشطرنج</h1>
+  <p class="mut" style="margin:0">صوّر الرقعة أو ارفع صورة أو فيديو، والتطبيق يقرأ القطع ويطلعلك أفضل نقلة بسهم. اقرا اللي فهمه وصلّحه قبل التحليل.</p>
+
+  <section class="card" aria-label="مصدر الرقعة">
+    <h2>1. هات الرقعة</h2>
+    <div class="row">
+      <label class="btn pri" for="inCam">📷 صوّر بالكاميرا</label>
+      <label class="btn" for="inImg">🖼 اختار صورة</label>
+      <label class="btn" for="inVid">🎬 فيديو</label>
+      <button id="btnLive">📡 كاميرا مباشرة</button>
+      <button id="btnStart">رقعة البداية</button>
+    </div>
+    <input type="file" id="inCam" accept="image/*" capture="environment">
+    <input type="file" id="inImg" accept="image/*">
+    <input type="file" id="inVid" accept="video/*">
+    <div id="srcMsg" class="mut" role="status" style="margin-top:8px"></div>
+    <div id="prevBox" class="hide" style="margin-top:8px">
+      <div class="prev"><canvas id="prevCv"></canvas></div>
+      <div class="row" style="margin-top:8px">
+        <button id="bMinus" aria-label="تصغير الإطار">➖ إطار</button><button id="bPlus" aria-label="تكبير الإطار">➕ إطار</button>
+        <button id="bAuto">🔍 دوّر على الرقعة</button><button id="bRead" class="pri">اقرأ القطع</button>
+      </div>
+      <div class="mut">اسحب الإطار الأخضر على الرقعة لو لقاها غلط.</div>
+    </div>
+  </section>
+
+  <section id="vidCard" class="card hide" aria-label="فيديو">
+    <h2>الفيديو / الكاميرا المباشرة</h2>
+    <div id="vwrap"><video id="vid" playsinline muted controls></video><canvas id="vov"></canvas></div>
+    <div class="row" style="margin-top:8px">
+      <button id="vGrab" class="pri">حلّل اللقطة دي</button>
+      <button id="vScan">حلّل الفيديو كله بالأسهم</button>
+      <button id="vStop" class="hide">إيقاف</button>
+    </div>
+    <div id="vMsg" class="mut" role="status" style="margin-top:6px"></div>
+    <div id="tl" class="tl" style="margin-top:6px"></div>
+  </section>
+
+  <section class="card" aria-label="الرقعة">
+    <h2>2. راجع الرقعة</h2>
+    <div id="boardwrap"><div id="board" role="grid" aria-label="رقعة الشطرنج"></div><svg id="arrows" viewBox="0 0 8 8" aria-hidden="true"></svg></div>
+    <div class="pal" id="pal" style="margin-top:10px" role="group" aria-label="القطع"></div>
+    <div class="row opts" style="margin-top:10px">
+      <span>الدور على:</span>
+      <button id="sideW" aria-pressed="true">الأبيض</button><button id="sideB" aria-pressed="false">الأسود</button>
+      <button id="flip">🔄 اقلب الرقعة</button>
+      <button id="clear">مسح الرقعة</button>
+    </div>
+    <div class="opts" style="margin-top:8px"><span class="mut">التبييت المسموح: </span>
+      <label><input type="checkbox" id="cK"> الأبيض قصير</label><label><input type="checkbox" id="cQ"> الأبيض طويل</label>
+      <label><input type="checkbox" id="ck"> الأسود قصير</label><label><input type="checkbox" id="cq"> الأسود طويل</label></div>
+    <div style="margin-top:8px"><input type="text" id="fen" aria-label="FEN" spellcheck="false" placeholder="FEN"></div>
+    <div class="row" style="margin-top:8px"><button id="fenGo">حمّل FEN</button><button id="fenCopy">انسخ FEN</button></div>
+  </section>
+
+  <section class="card" aria-label="التحليل">
+    <h2>3. أفضل نقلة</h2>
+    <div class="row"><button id="go" class="pri">حلّل</button>
+      <span class="opts"><label><input type="checkbox" id="useSF" checked> جرّب Stockfish (محتاج نت)</label></span></div>
+    <div id="res" role="status" aria-live="polite" style="margin-top:8px" class="mut">اضغط «حلّل» بعد ما تراجع الرقعة.</div>
+  </section>
+  <p class="mut" style="text-align:center">القراءة من الصور تقريبية وبتتأثر بشكل القطع والإضاءة، فراجع الرقعة قبل ما تعتمد على النتيجة.</p>
+</main>
+<script src="chess.js"></script>
+<script src="vision.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

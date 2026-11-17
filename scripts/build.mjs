@@ -44,4 +44,6 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 fs.writeFileSync(path.join(out, 'index.html'), html);
 for (const f of ['src/config.js', 'src/manifest.webmanifest', 'src/sw.js', 'src/privacy.html']) fs.copyFileSync(path.join(root, f), path.join(out, path.basename(f)));
 for (const f of fs.readdirSync(path.join(root, 'src/icons'))) fs.copyFileSync(path.join(root, 'src/icons', f), path.join(out, 'icons', f));
+fs.mkdirSync(path.join(out, 'chess'), { recursive: true });
+for (const f of fs.readdirSync(path.join(root, 'chess'))) fs.copyFileSync(path.join(root, 'chess', f), path.join(out, 'chess', f));
 console.log('built www/index.html', (html.length / 1024).toFixed(0) + ' KB');
