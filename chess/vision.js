@@ -100,7 +100,7 @@
     return inter / uni - 0.35 * Math.abs(Math.log(a.asp / b.asp));
   }
   /* templates: [{t:1..6, bits, asp}], built from font glyphs by the page (see makeTemplates in app) */
-  function readBoard(img, box, tpl) {
+  function readBoard(img, box, tpl, keep) {
     const { data, width: W, height: H } = img, cs = box.s / 8, cells = [], k = Math.max(1, Math.min(3, Math.floor(cs / N)));
     for (let row = 0; row < 8; row++) for (let col = 0; col < 8; col++) {
       const cx = box.x + col * cs, cy = box.y + row * cs, R = new Float32Array(N * N), G = new Float32Array(N * N), B = new Float32Array(N * N);
@@ -132,15 +132,19 @@
     }
     // piece height relative to the tallest pieces on this board (pawns are short, kings/queens tall)
     const hs = cells.filter((c) => c.occ && c.nb).map((c) => c.nb.bh).sort((a, b) => a - b), ref = hs.length ? hs[Math.min(hs.length - 1, Math.floor(hs.length * 0.9))] : 1;
+    // two template families (real chess.com silhouettes vs. generic font glyphs): use whichever one fits this board better overall
+    const fam = (c, real) => {
+      const per = {}, rh = c.nb.bh / ref;
+      for (const T of tpl) { if (!!T.real !== real) continue; const sc = similarity(c.nb, T) - 0.25 * Math.abs(Math.min(1.1, rh) - REL[T.t]); if (per[T.t] === undefined || sc > per[T.t]) per[T.t] = sc; }
+      const arr = Object.entries(per).map(([t, v]) => [+t, v]).sort((a, b) => b[1] - a[1]); return arr.length ? { t: arr[0][0], s: arr[0][1], conf: arr[0][1] - (arr[1] ? arr[1][1] : -9) } : null;
+    };
+    const occ = cells.filter((c) => c.occ && c.nb), res = { f: [], r: [] };
+    occ.forEach((c) => { c.fr = fam(c, false); c.rr = fam(c, true); if (c.fr) res.f.push(c.fr.s); if (c.rr) res.r.push(c.rr.s); });
+    const mean = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : -9, useReal = mean(res.r) > mean(res.f) + 0.03;
     cells.forEach((c) => {
       if (!c.occ) return;
-      let bestT = 0, bs = -9, second = -9;
-      if (c.nb && tpl) {
-        const per = {}; const rh = c.nb.bh / ref;
-        for (const T of tpl) { const sc = similarity(c.nb, T) - 0.25 * Math.abs(Math.min(1.1, rh) - REL[T.t]); if (per[T.t] === undefined || sc > per[T.t]) per[T.t] = sc; }
-        const arr = Object.entries(per).map(([t, v]) => [+t, v]).sort((a, b) => b[1] - a[1]); bestT = arr[0][0]; bs = arr[0][1]; second = arr[1] ? arr[1][1] : -9;
-      }
-      c.t = bestT; c.conf = bs - second; c.sim = bs; delete c.nb;
+      const p = c.nb && tpl ? (useReal ? c.rr : c.fr) || c.fr || c.rr : null;
+      c.t = p ? p.t : 0; c.conf = p ? p.conf : 0; c.sim = p ? p.s : -9; if (!keep) { delete c.nb; } delete c.fr; delete c.rr;
     });
     return cells;
   }
@@ -159,6 +163,8 @@
   }
   function guessFlipped(cells) { let top = 0, bot = 0; cells.forEach((c, i) => { if (c.t && c.c > 0) { if (i < 32) top++; else bot++; } }); return top > bot; }
   /* silhouettes of the six piece types from whatever chess glyph fonts the device has */
+  /* silhouettes sampled from a real chess.com board screenshot (24x24, bounding-box normalised): [type, aspect, hex bits] */
+  const REAL = [[4, 0.76, "007f003ffff87ffffc7ffffc3ffffc1ffffc3ffffc1ffffc0fffe01fffe01ffff01ffff81ffff81ffff80ffff80ffff81ffff81ffffc1ffffcffffffffffffffffffffffffffffff"], [5, 0.963, "01e78003ffc007ffc007fe0003fc8013ff8f7bff9f2fefbfffffff67ffff3ffffc3bfffc39fff818fff819fff009fff00ffff00fffe00fffe01ffff03ffff83ffff83ffffc3ffffc"], [4, 0.76, "1cfe703e7ffc7e3ffe7ffffc7ffffc3ffffc1ffffc3ffffc1ffff81ffff01ffff81ffff81ffff81ffff81ffff81ffff83ffff83ffff8fffffcfffffeffffffffffffffffffffffff"], [6, 0.926, "00780000fc0001ff8001ff8001ff8000ff003ffffc7ffffefffffffffffffffffffffffffffffffffffefffffcfffffc3ffff01ffff01ffff03ffff83ffff83ffff83ffff83ffff8"], [1, 0.739, "007e00007f0000ffc001ffe003ffe007ffe007ffe003ffe001ffc007ffe00ffff007fff003ffe001ff8001ff8003ffc01ffff83ffffcfffffeffffffffffffffffffffffffffffff"], [1, 0.739, "007e00007e0000ff0003ff0007ffc007ffe007ffe003ffc001ff8007ff800ffff007ffe003ffc001ff8001ff0003ffc017ffe03ffff8fffffcfffffeffffffffffffffffff000003"], [1, 0.739, "00780000fe0003ff0007ff8007ffc00fffe007ffe007ffe003ffc007ffe01ffff01fffe007ffc001ff0003ff001fff803fffe03ffff8fffffcfffffefffffe3ffffcffffffffffff"], [1, 0.739, "001800003800007f0003ffc007ffe00fffe007ffe007ffe003ffc007ffc007ffe007ffe000ffe000ffe007ffc007ffc01fffe03ffff87ffffcffffffffffffffffffffffffcf001f"], [1, 0.783, "007e0000ff0001ff8003ffc007ffe007ffe007ffe003ffc003ffc003ffe000fec003ffc003ffe001ffc003ffc003ffc00ffff81ffffc3ffffc7ffffeffffffffffffffffffffffff"], [1, 0.739, "000e0000ff0001ffc001ffe003ff4007ff0007fe0003fec001ffe007ffe00ffff00ffff007ffe003ffe000ffe001ffe007fff81ffffc3fffff7ffffffffffffffffcffffffffffff"], [3, 0.731, "007e0000ff0000ff0000fe0001fc8003ffc003fff007fff80ffff81ffff83ffffc3ffffe3ffffe3ffffe3ffffe3ffffc1ffffc0ffff807fff83ffffc7fffffffffffffffffffffff"], [2, 0.88, "01f00001ff0003ff8007ffe00ffff00ffff807fffc0ffffc1ffffc3fffff3ffffffffffefffffefffffefe7ffe1cffff01ffff03fffc03fffc07ffff0fffff0fffff1bffff1bffff"], [5, 1.04, "03f7c003ffe007ffe003ffe031fffe7dffffffffffffffffffffff7fffff3ffffe3ffffc1ffff81ffff81ffff80ffff80ffff00fffe007ffe00ffff01ffff81ffff81ffff81ffffc"], [1, 0.81, "00ff8000ff8000ffc003ffe007ffe007ffe003ffe001ffe001ff8003ffc007ffe00ffff007fff003ffe001ff8001ff8007ffe007ffe01ffffc3ffffeffffffffffffffffffffffff"], [1, 0.818, "00e00000ff8000ffc001ffc003ffe003ffe003fff003fff003ffe003ffe803fff807fff007fff007fff003ffc000ffc007ffe00ffff01ffff8bffffcfffffeffffffffffff7fffff"], [1, 0.762, "01ff8001ffc003ffc003ffc003ffe003ffe007ffc00fffc003ffc007ffe00ffff80ffff80ffff007ffe001ffc001ffc00ffff01ffff83ffffcffffffffffffffffffffffffffffff"], [4, 0.87, "007f300f7f381ffffc3ffffe3ffffc3ffffc3ffffc1ffffc0ffffc0ffff80ffff00ffff00ffff80ffff80ffff80ffff80ffff80ffffc1ffffc1ffffcffffffffffff7fffff7fffff"], [4, 0.826, "06fc001efe383efffc7efffc6ffffc1ffffc1ffffc3ffffc3ffff81ffff00ffff01ffff81ffff81ffff81ffff81ffff83ffff83ffff83ffff83ffffcffffffffffffffffffffffff"], [6, 1.08, "003e0000ff0000ff8000ff8000ff8007fff81ffffe3fffff3fffff7fffff7fffffffffffffffff7fffff7fffff3ffffe1ffffe0ffffc0ffff80ffff00ffff00ffff80ffff80ffff8"]];
   function makeTemplates(doc) {
     const fonts = ['"DejaVu Sans"', '"Segoe UI Symbol"', '"Apple Symbols"', '"Noto Sans Symbols 2"', '"FreeSerif"', '"Arial Unicode MS"', 'serif', 'sans-serif'];
     const glyph = { 1: '\u265F', 2: '\u265E', 3: '\u265D', 4: '\u265C', 5: '\u265B', 6: '\u265A' };
@@ -176,6 +182,7 @@
       const keys = set.map((x) => x.bits.join('')); if (new Set(keys).size < 6) continue; // missing glyphs draw identical boxes
       const fk = keys[0] + keys[5]; if (seen.has(fk)) continue; seen.add(fk); out.push(...set);
     }
+    for (const [t, asp, hx] of REAL) { const bits = new Uint8Array(TN * TN), big = BigInt('0x' + hx); for (let i = 0; i < TN * TN; i++) bits[i] = Number((big >> BigInt(TN * TN - 1 - i)) & 1n); out.push({ t, bits, asp, real: true }); }
     return out;
   }
   const V = { makeTemplates, findBoard, readBoard, cellsToFEN, guessFlipped, normBits, TN };
