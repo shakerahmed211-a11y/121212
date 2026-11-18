@@ -23,6 +23,8 @@ input[type=file]{display:none}
 #boardwrap{position:relative;width:min(100%,540px);margin:0 auto;direction:ltr;touch-action:manipulation}
 #board{display:grid;grid-template-columns:repeat(8,1fr);aspect-ratio:1;border-radius:8px;overflow:hidden;border:2px solid var(--line)}
 .sq{position:relative;display:grid;place-items:center;font-size:clamp(22px,8.2vw,50px);line-height:1;user-select:none;-webkit-user-select:none}
+.sq{aspect-ratio:1/1;min-width:0}
+#board,#gboard{grid-auto-rows:1fr}
 .sq.l{background:var(--light)}.sq.d{background:var(--dark)}
 .sq.sel{outline:3px solid var(--acc2);outline-offset:-3px}
 .sq.low::after{content:"";position:absolute;inset:3px;border:2px dashed var(--warn);border-radius:4px;pointer-events:none}
@@ -46,14 +48,25 @@ video{width:100%;border-radius:10px;background:#000;display:block}
 .opts label{display:inline-flex;gap:6px;align-items:center;margin-inline-end:10px}
 input[type=text]{width:100%;font:inherit;direction:ltr;padding:8px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink)}
 .err{color:var(--bad)}
+.tabs{display:flex;gap:8px}.tabs button{flex:1}
+.stk{display:flex;flex-direction:column;gap:14px}
+.sq.mv::after{content:"";position:absolute;width:30%;height:30%;border-radius:50%;background:rgba(20,30,40,.35);pointer-events:none}
+.sq.cp::after{content:"";position:absolute;inset:2px;border-radius:50%;border:4px solid rgba(20,30,40,.35);pointer-events:none}
+.sq.last{box-shadow:inset 0 0 0 100px rgba(255,235,59,.35)}
+.sq.chk{box-shadow:inset 0 0 0 100px rgba(255,77,77,.55)}
+.moves{direction:ltr;font-variant-numeric:tabular-nums;max-height:120px;overflow:auto;line-height:1.9}
+.promo{display:flex;gap:8px;justify-content:center;margin-top:8px}.promo button{font-size:2rem;min-height:56px;min-width:56px;line-height:1}
+.lv button{flex:1 1 30%}
 .hide{display:none!important}
 </style>
 </head>
 <body>
 <main>
-  <h1>♞ محلل الشطرنج</h1>
+  <h1>♞ الشطرنج</h1>
+  <div class="tabs" role="tablist"><button id="tabAn" role="tab" aria-pressed="true">🔍 محلل الصور</button><button id="tabPlay" role="tab" aria-pressed="false">🎮 العب ضد الكمبيوتر</button></div>
   <p class="mut" style="margin:0">صوّر الرقعة أو ارفع صورة أو فيديو، والتطبيق يقرأ القطع ويطلعلك أفضل نقلة بسهم. اقرا اللي فهمه وصلّحه قبل التحليل.</p>
 
+<div id="viewAn" class="stk">
   <section class="card" aria-label="مصدر الرقعة">
     <h2>1. هات الرقعة</h2>
     <div class="row">
@@ -112,7 +125,28 @@ input[type=text]{width:100%;font:inherit;direction:ltr;padding:8px;border-radius
       <span class="opts"><label><input type="checkbox" id="useSF" checked> جرّب Stockfish (محتاج نت)</label></span></div>
     <div id="res" role="status" aria-live="polite" style="margin-top:8px" class="mut">اضغط «حلّل» بعد ما تراجع الرقعة.</div>
   </section>
-  <p class="mut" style="text-align:center">القراءة من الصور تقريبية وبتتأثر بشكل القطع والإضاءة، فراجع الرقعة قبل ما تعتمد على النتيجة.</p>
+  <p class="mut" style="text-align:center;margin:0">القراءة من الصور تقريبية وبتتأثر بشكل القطع والإضاءة، فراجع الرقعة قبل ما تعتمد على النتيجة.</p>
+</div>
+
+<div id="viewPlay" class="stk hide">
+  <section class="card" aria-label="إعدادات اللعبة">
+    <h2>العب ضد الكمبيوتر</h2>
+    <div class="mut" style="margin-bottom:6px">المستوى:</div>
+    <div class="row lv" id="lvBtns" role="group" aria-label="مستوى الكمبيوتر"></div>
+    <div class="row" style="margin-top:10px"><span>لونك:</span>
+      <button id="colW" aria-pressed="true">أبيض</button><button id="colB" aria-pressed="false">أسود</button><button id="colR" aria-pressed="false">عشوائي</button></div>
+    <div class="row" style="margin-top:10px"><button id="gNew" class="pri">ابدأ لعبة جديدة</button><button id="gFromEd">ابدأ من الرقعة اللي في المحلل</button></div>
+    <div id="lvNote" class="mut" style="margin-top:6px"></div>
+  </section>
+  <section class="card" aria-label="اللعبة">
+    <div id="gStatus" role="status" aria-live="polite" style="font-weight:700;margin-bottom:8px">اضغط «ابدأ لعبة جديدة».</div>
+    <div id="gwrap" style="position:relative;width:min(100%,540px);margin:0 auto;direction:ltr"><div id="gboard" style="display:grid;grid-template-columns:repeat(8,1fr);aspect-ratio:1;border-radius:8px;overflow:hidden;border:2px solid var(--line)" role="grid" aria-label="رقعة اللعب"></div><svg id="garrows" viewBox="0 0 8 8" aria-hidden="true" style="position:absolute;inset:0;pointer-events:none;width:100%;height:100%"></svg></div>
+    <div id="promo" class="promo hide" role="group" aria-label="اختار قطعة الترقية"></div>
+    <div class="row" style="margin-top:10px"><button id="gUndo">↩ تراجع</button><button id="gHint">💡 تلميح</button><button id="gFlip">🔄 اقلب</button><button id="gRes">🏳 استسلم</button></div>
+    <div class="row" style="margin-top:8px"><button id="gAn">حلّل الموقف</button><button id="gPgn">انسخ النقلات (PGN)</button></div>
+    <div id="gMoves" class="moves mut" style="margin-top:8px"></div>
+  </section>
+</div>
 </main>
 <script src="chess.js"></script>
 <script src="vision.js"></script>

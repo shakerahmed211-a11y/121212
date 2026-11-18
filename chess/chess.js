@@ -157,7 +157,7 @@
 
   /* ---------- search ---------- */
   const MATE = 30000;
-  function search(pos, ms, maxDepth, exclude) {
+  function search(pos, ms, maxDepth, exclude, all) {
     const t0 = Date.now(), dl = t0 + ms; let nodes = 0; const STOP = {};
     const killers = []; const hist = new Int32Array(128 * 128);
     const mvv = (m) => { const v = Math.abs(pos.b[(m >> 7) & 127]) || (((m >> 17) & 1) ? 1 : 0); return v ? v * 16 - Math.abs(pos.b[m & 127]) + 1000 : 0; };
@@ -186,20 +186,20 @@
       return best;
     }
     const root = pos.legal().filter((m) => !(exclude && exclude.includes(m))); if (!root.length) return { move: 0, score: pos.inCheck() ? -MATE : 0, depth: 0, nodes: 0, none: true };
-    let best = root[0], bs = 0, depth = 0, pvm = 0; const base = pos.st.length;
+    let best = root[0], bs = 0, depth = 0, pvm = 0, allSc = null; const base = pos.st.length;
     try {
       for (let d = 1; d <= (maxDepth || 9); d++) {
-        let alpha = -Infinity, cb = 0, cs = -Infinity;
+        let alpha = -Infinity, cb = 0, cs = -Infinity; const scs = [];
         for (const m of order(root, 0, pvm)) {
-          pos.make(m); const v = -nm(d - 1, -Infinity, -alpha, 1); pos.unmake();
-          if (v > cs) { cs = v; cb = m; } if (v > alpha) alpha = v;
+          pos.make(m); const v = -nm(d - 1, -Infinity, all ? Infinity : -alpha, 1); pos.unmake(); scs.push({ m, v });
+          if (v > cs) { cs = v; cb = m; } if (v > alpha && !all) alpha = v;
         }
-        best = cb; bs = cs; depth = d; pvm = cb;
+        best = cb; bs = cs; depth = d; pvm = cb; if (all) allSc = scs;
         if (Math.abs(bs) > MATE - 100) break;
         if (Date.now() > dl) break;
       }
     } catch (e) { if (e !== STOP) throw e; while (pos.st.length > base) pos.unmake(); }
-    return { move: best, score: bs, depth, nodes, ms: Date.now() - t0 };
+    return { move: best, score: bs, depth, nodes, ms: Date.now() - t0, all: allSc };
   }
   const E = { Pos, perft, search, evaluate, sqName, parseSq, CH, MATE, START: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1' };
   if (typeof module !== 'undefined' && module.exports) module.exports = E; else root.CE = E;

@@ -277,3 +277,108 @@ async function scanVideo() {
   if (!TPL.length) msg('#srcMsg', 'جهازك مفيهوش خط بقطع الشطرنج، فقراءة الصور مش هتشتغل. تقدر ترتب الرقعة بإيدك.', true);
   window.__ready = true;
 })();
+
+/* ---------- tabs ---------- */
+function showTab(t) { const play = t === 'play'; $('#viewAn').classList.toggle('hide', play); $('#viewPlay').classList.toggle('hide', !play); $('#tabAn').setAttribute('aria-pressed', !play); $('#tabPlay').setAttribute('aria-pressed', play); if (play) renderG(); }
+$('#tabAn').onclick = () => showTab('an'); $('#tabPlay').onclick = () => showTab('play');
+
+/* ---------- play against the computer ---------- */
+const LEVELS = [null,
+  { n: 'مبتدئ', d: 1, noise: 300, rnd: 0.2, note: 'بيغلط كتير ومبيشوفش أكتر من نقلة.' },
+  { n: 'سهل', d: 2, noise: 150, note: 'بيشوف نقلتين وبيغلط أحيانًا.' },
+  { n: 'متوسط', d: 3, noise: 70, note: 'بيحسب 3 نقلات ولسه بيغلط أحيانًا.' },
+  { n: 'كويس', d: 4, noise: 25, note: 'لاعب منظم، بيصعب عليك الغلط.' },
+  { n: 'قوي', ms: 1200, d: 7, note: 'بيفكر حوالي ثانية في كل نقلة.' },
+  { n: 'خبير', ms: 3000, d: 12, note: 'أقوى مستوى في المحرك المدمج (بيفكر 3 ثواني).' },
+  { n: 'ماستر', sf: 1, ms: 1500, note: 'Stockfish لو في نت، وإلا بيلعب بمستوى «خبير».' }];
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } } };
+let gLevel = Math.min(7, Math.max(1, +store.get('qc_lvl', 3) || 3)), gColorPref = store.get('qc_col', 'w'), G = null, gView = 1, gSel = -1, gHint = null;
+(function lvInit() {
+  const box = $('#lvBtns');
+  for (let i = 1; i < LEVELS.length; i++) { const b = document.createElement('button'); b.textContent = `${i}. ${LEVELS[i].n}`; b.setAttribute('aria-pressed', i === gLevel); b.onclick = () => { gLevel = i; store.set('qc_lvl', i); box.querySelectorAll('button').forEach((x, k) => x.setAttribute('aria-pressed', k + 1 === i)); $('#lvNote').textContent = LEVELS[i].note; }; box.append(b); }
+  $('#lvNote').textContent = LEVELS[gLevel].note;
+  const cols = { w: '#colW', b: '#colB', r: '#colR' };
+  const setc = (c) => { gColorPref = c; store.set('qc_col', c); for (const k in cols) $(cols[k]).setAttribute('aria-pressed', k === c); };
+  for (const k in cols) $(cols[k]).onclick = () => setc(k); setc(gColorPref);
+})();
+const gKey = (p) => p.toFEN().split(' ').slice(0, 4).join(' ');
+function gStatusSet(t, err) { const el = $('#gStatus'); el.textContent = t; el.classList.toggle('err', !!err); }
+function newGame(fen) {
+  let pos; try { pos = new CE.Pos().setFEN(fen || CE.START); } catch (e) { gStatusSet(e.message, true); return; }
+  const hp = gColorPref === 'r' ? (Math.random() < 0.5 ? 1 : -1) : gColorPref === 'b' ? -1 : 1;
+  G = { pos, human: hp, hist: [], keys: [gKey(pos)], over: null, thinking: false, last: null, start: pos.toFEN(), id: Date.now() };
+  gView = hp; gSel = -1; gHint = null; $('#promo').classList.add('hide'); renderG(); afterMove();
+}
+function endCheck() {
+  const p = G.pos, legal = p.legal();
+  if (!legal.length) return p.inCheck() ? { res: p.side > 0 ? '0-1' : '1-0', why: 'كش مات' } : { res: '1/2-1/2', why: 'ستالميت (تعادل)' };
+  if (p.hm >= 100) return { res: '1/2-1/2', why: 'تعادل بقاعدة الخمسين نقلة' };
+  if (G.keys.filter((k) => k === G.keys[G.keys.length - 1]).length >= 3) return { res: '1/2-1/2', why: 'تعادل بتكرار الوضع 3 مرات' };
+  const others = []; for (let s = 0; s < 128; s++) { if (s & 0x88) { s += 7; continue; } const v = Math.abs(p.b[s]); if (v && v !== 6) others.push(v); }
+  if (!others.length || (others.length === 1 && (others[0] === 2 || others[0] === 3))) return { res: '1/2-1/2', why: 'تعادل: مفيش مواد كفاية للكش مات' };
+  return null;
+}
+function afterMove() {
+  const o = endCheck(); if (o) { G.over = o; const w = o.res === '1-0' ? 1 : o.res === '0-1' ? -1 : 0; gStatusSet(w === 0 ? `انتهت: ${o.why}.` : (w === G.human ? `مبروك! كسبت — ${o.why}.` : `الكمبيوتر كسب — ${o.why}.`)); renderG(); return; }
+  if (G.pos.side === G.human) { gStatusSet(G.pos.inCheck() ? 'دورك — إنت في كش!' : 'دورك.'); renderG(); } else { renderG(); computerMove(); }
+}
+function applyMove(m) {
+  const p = G.pos, san = p.san(m), uci = p.uci(m); p.make(m); G.hist.push({ san, uci }); G.keys.push(gKey(p)); G.last = [m & 127, (m >> 7) & 127]; gSel = -1; gHint = null;
+}
+async function pickMove(pos, L) {
+  const legal = pos.legal();
+  if (L.sf) { try { const w = await loadSF(), got = await sfRun(w, pos.toFEN(), L.ms); if (got['1']) { const m = pos.fromUCI(got['1'].pv[0]); if (m) return m; } } catch (e) { /* offline: fall through to the built-in engine */ } return CE.search(pos, 2500, 12).move; }
+  if (L.rnd && Math.random() < L.rnd) return legal[Math.floor(Math.random() * legal.length)];
+  if (L.noise) { const r = CE.search(pos, 500, L.d, null, true); let b = null, bv = -1e9; for (const x of r.all || []) { const v = x.v + (Math.random() * 2 - 1) * L.noise; if (v > bv) { bv = v; b = x.m; } } return b || r.move; }
+  return CE.search(pos, L.ms, L.d).move;
+}
+async function computerMove() {
+  if (!G || G.over || G.thinking) return; const id = G.id; G.thinking = true; gStatusSet('الكمبيوتر بيفكر…');
+  await new Promise((r) => setTimeout(r, 80));
+  let m = 0; try { m = await pickMove(G.pos, LEVELS[gLevelAtStart(G)]); } catch (e) { m = G.pos.legal()[0]; }
+  if (!G || G.id !== id || !G.thinking) return; G.thinking = false; if (m) applyMove(m); afterMove();
+}
+const gLevelAtStart = () => gLevel;
+function renderG() {
+  const bd = $('#gboard'); if (!bd) return; bd.textContent = ''; if (!G) { bd.textContent = ''; }
+  const pos = G ? G.pos : new CE.Pos().setFEN(CE.START), legal = G && gSel >= 0 ? pos.legal().filter((m) => (m & 127) === gSel) : [], dests = new Map(legal.map((m) => [(m >> 7) & 127, m]));
+  const ksq = pos.inCheck() ? pos.k[pos.side > 0 ? 0 : 1] : -1;
+  for (let i = 0; i < 64; i++) {
+    const r = gView > 0 ? 7 - (i >> 3) : (i >> 3), f = gView > 0 ? (i & 7) : 7 - (i & 7), s = r * 16 + f, d = document.createElement('div'), p = pos.b[s];
+    d.className = 'sq ' + ((r + f) % 2 === 0 ? 'd' : 'l') + (s === gSel ? ' sel' : '') + (G && G.last && (G.last[0] === s || G.last[1] === s) ? ' last' : '') + (dests.has(s) ? (p ? ' cp' : ' mv') : '') + (s === ksq ? ' chk' : '');
+    d.dataset.s = s; d.setAttribute('role', 'gridcell');
+    if (p) { const sp = document.createElement('span'); sp.className = p > 0 ? 'pw' : 'pb'; sp.textContent = GL[Math.abs(p)] + VS; d.append(sp); d.setAttribute('aria-label', (p > 0 ? 'أبيض ' : 'أسود ') + FILES[f] + (r + 1)); } else d.setAttribute('aria-label', FILES[f] + (r + 1));
+    if ((i >> 3) === 7) { const c = document.createElement('span'); c.className = 'co'; c.textContent = FILES[f]; d.append(c); }
+    bd.append(d);
+  }
+  let mv = ''; if (G) G.hist.forEach((h, i) => { if (i % 2 === 0) mv += `${Math.floor(i / 2) + 1}. `; mv += h.san + ' '; }); $('#gMoves').textContent = mv || '';
+  let ar = ''; if (gHint) { const cen = (s) => gView > 0 ? [(s & 7) + 0.5, 7 - (s >> 4) + 0.5] : [7 - (s & 7) + 0.5, (s >> 4) + 0.5]; ar = arrowSVG(cen(CE.parseSq(gHint.slice(0, 2))), cen(CE.parseSq(gHint.slice(2, 4))), COL[0], 0.2); } $('#garrows').innerHTML = ar;
+}
+$('#gboard').addEventListener('click', (e) => {
+  const d = e.target.closest('.sq'); if (!d || !G || G.over || G.thinking || G.pos.side !== G.human) return; const s = +d.dataset.s, p = G.pos;
+  if (gSel >= 0) { const ms = p.legal().filter((m) => (m & 127) === gSel && ((m >> 7) & 127) === s); if (ms.length) { if (ms.length > 1) { showPromo(ms); return; } humanMove(ms[0]); return; } }
+  gSel = p.b[s] * p.side > 0 ? (s === gSel ? -1 : s) : -1; renderG();
+});
+function showPromo(ms) {
+  const box = $('#promo'); box.textContent = ''; box.classList.remove('hide'); const nm = { 5: 'وزير', 4: 'رخ', 3: 'فيل', 2: 'حصان' };
+  for (const m of ms.sort((a, b) => ((b >> 14) & 7) - ((a >> 14) & 7))) { const t = (m >> 14) & 7, b = document.createElement('button'), sp = document.createElement('span'); sp.className = G.human > 0 ? 'pw' : 'pb'; sp.textContent = GL[t] + VS; b.append(sp); b.setAttribute('aria-label', 'رقّي إلى ' + nm[t]); b.onclick = () => { box.classList.add('hide'); humanMove(m); }; box.append(b); }
+}
+function humanMove(m) { applyMove(m); afterMove(); }
+$('#gNew').onclick = () => newGame();
+$('#gFromEd').onclick = () => { try { const f = getFEN(); new CE.Pos().setFEN(f); newGame(f); } catch (e) { gStatusSet(e.message, true); } };
+$('#gUndo').onclick = () => {
+  if (!G || G.thinking || !G.hist.length) return; G.over = null; $('#promo').classList.add('hide');
+  do { G.pos.unmake(); G.hist.pop(); G.keys.pop(); } while (G.hist.length && G.pos.side !== G.human);
+  G.last = null; gSel = -1; gHint = null; afterMove();
+};
+$('#gHint').onclick = async () => {
+  if (!G || G.over || G.thinking || G.pos.side !== G.human) return; gStatusSet('بدوّر على أحسن نقلة…'); await new Promise((r) => setTimeout(r, 30));
+  try { const r = await analyze(G.pos.toFEN(), { sf: false, bms: 900 }); if (r.lines && r.lines[0]) { gHint = r.lines[0].uci; gStatusSet('تلميح: ' + r.lines[0].san + ' (السهم الأخضر).'); } } catch (e) { gStatusSet(e.message, true); } renderG();
+};
+$('#gFlip').onclick = () => { gView = -gView; renderG(); };
+$('#gRes').onclick = () => { if (!G || G.over) return; G.thinking = false; G.over = { res: G.human > 0 ? '0-1' : '1-0', why: 'استسلام' }; gStatusSet('استسلمت. الكمبيوتر كسب.'); renderG(); };
+$('#gAn').onclick = () => { if (!G) return; loadFEN(G.pos.toFEN()); showTab('an'); $('#board').scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+$('#gPgn').onclick = async () => {
+  if (!G) return; let s = ''; G.hist.forEach((h, i) => { if (i % 2 === 0) s += `${Math.floor(i / 2) + 1}. `; s += h.san + ' '; }); const t = `[Event "ضد الكمبيوتر (مستوى ${gLevel})"]\n[FEN "${G.start}"]\n[Result "${G.over ? G.over.res : '*'}"]\n\n${s.trim()} ${G.over ? G.over.res : '*'}`;
+  try { await navigator.clipboard.writeText(t); gStatusSet('تم نسخ النقلات.'); } catch (e) { gStatusSet('مقدرتش أنسخ، حدد النقلات يدويًا.', true); }
+};
